@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearch } from '@tanstack/react-router'
+import { AvisoPruebaIngreso } from '@/demo/aviso-prueba'
 import { Eye, EyeOff, Loader2, LogIn } from 'lucide-react'
 import { api, mensajeDeError } from '@/lib/api'
 import { consultaSesion, type UsuarioSesion } from '@/lib/sesion'
@@ -169,6 +170,13 @@ export function Ingresar() {
           </Form>
         </CardContent>
       </Card>
+      <AvisoPruebaIngreso
+        onElegir={(usuario, pin) => {
+          form.setValue('usuario', usuario)
+          form.setValue('pin', pin)
+          setError(null)
+        }}
+      />
     </AuthLayout>
   )
 }

@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { EtiquetaPrueba } from '@/demo/aviso-prueba'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Header } from './header'
@@ -24,6 +25,7 @@ export function Pagina({
     <>
       <Header fixed>
         <Search className='me-auto' />
+        <EtiquetaPrueba />
         <ThemeSwitch />
       </Header>
       <Main>

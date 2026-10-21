@@ -17,7 +17,9 @@
     "test:coverage": "vitest run --coverage --browser.headless",
     "db:generar": "drizzle-kit generate",
     "db:migrar": "drizzle-kit migrate",
-    "crear-admin": "tsx scripts/crear-admin.ts"
+    "crear-admin": "tsx scripts/crear-admin.ts",
+    "dev:prueba": "VITE_DEMO=1 vite",
+    "build:prueba": "VITE_DEMO=1 vite build --base ./ --outDir dist-prueba"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",

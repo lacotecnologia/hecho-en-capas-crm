@@ -22,6 +22,14 @@ export async function api<T>(
   ruta: string,
   opciones: Opciones = {}
 ): Promise<T> {
+  if (import.meta.env.VITE_DEMO === '1') {
+    const { apiDemo } = await import('@/demo/api-demo')
+    return apiDemo<T>(
+      ruta,
+      opciones.method ?? 'GET',
+      opciones.body as Record<string, unknown> | undefined
+    )
+  }
   let respuesta: Response
   try {
     respuesta = await fetch(`/api${ruta}`, {

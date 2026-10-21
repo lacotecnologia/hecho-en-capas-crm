@@ -5,7 +5,11 @@ import {
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query'
-import { RouterProvider, createRouter } from '@tanstack/react-router'
+import {
+  RouterProvider,
+  createMemoryHistory,
+  createRouter,
+} from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { ApiError } from '@/lib/api'
 import { handleServerError } from '@/lib/handle-server-error'
@@ -48,6 +52,12 @@ const queryClient = new QueryClient({
 
 const router = createRouter({
   routeTree,
+  // En la versión de prueba publicada, la navegación vive en memoria
+  // (la página se sirve dentro de otra y no controla la barra de direcciones).
+  history:
+    import.meta.env.VITE_DEMO === '1'
+      ? createMemoryHistory({ initialEntries: ['/'] })
+      : undefined,
   context: { queryClient },
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 0,

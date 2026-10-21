@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 export function LogoIcono({ className }: { className?: string }) {
   return (
     <img
-      src='/images/icono.png'
+      src={`${import.meta.env.BASE_URL}images/icono.png`}
       alt=''
       aria-hidden='true'
       className={cn('size-8 object-contain', className)}
