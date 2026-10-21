@@ -3,6 +3,7 @@ import {
   ClipboardList,
   Home,
   type LucideIcon,
+  Package,
   Printer,
   Settings2,
   Truck,
@@ -58,7 +59,14 @@ export const MENU: GrupoMenu[] = [
         url: '/taller',
         icono: Printer,
         descripcion: 'Productos, precios de fábrica y cola de impresión',
-        roles: ['admin', 'comercial', 'fabricacion'],
+        roles: ['admin', 'fabricacion'],
+      },
+      {
+        titulo: 'Catálogo',
+        url: '/taller',
+        icono: Package,
+        descripcion: 'Productos listos para cotizar y su precio de fábrica',
+        roles: ['comercial'],
       },
       {
         titulo: 'Cobros',
@@ -98,10 +106,14 @@ export const MENU: GrupoMenu[] = [
 ]
 
 export function menuPara(roles: readonly Rol[]): GrupoMenu[] {
+  const vistas = new Set<string>()
   return MENU.map((grupo) => ({
     ...grupo,
-    items: grupo.items.filter((item) =>
-      item.roles.some((r) => roles.includes(r))
-    ),
+    items: grupo.items.filter((item) => {
+      if (!item.roles.some((r) => roles.includes(r)) || vistas.has(item.url))
+        return false
+      vistas.add(item.url)
+      return true
+    }),
   })).filter((grupo) => grupo.items.length > 0)
 }

@@ -12,7 +12,7 @@ Sistema interno para llevar cotizaciones, pedidos, taller (fabricación), cobros
 | Fase                 | Qué incluye                                                    | Estado    |
 | -------------------- | -------------------------------------------------------------- | --------- |
 | 1. Base              | Login con usuario + PIN, roles, Personas, Configuración, marca | ✅ Lista  |
-| 2. Taller I          | Impresoras, bobinas, catálogo y precio de fábrica              | Pendiente |
+| 2. Taller I          | Impresoras, bobinas, catálogo y precio de fábrica              | ✅ Lista  |
 | 3. Cotizar           | Cotizador con cálculos y PDF                                   | Pendiente |
 | 4. Pedidos           | Pedidos y cola de impresión                                    | Pendiente |
 | 5. Cobros y Entregas | Pagos, saldos, domicilios y envíos                             | Pendiente |
@@ -36,6 +36,7 @@ Abre `.env` y completa:
 
 - `DATABASE_URL`: la conexión a Postgres en tu VPS.
 - `SESSION_SECRET`: una frase larga al azar. Para generarla: `openssl rand -base64 48`
+- `BLOB_READ_WRITE_TOKEN` (opcional en tu Mac): para subir fotos y archivos 3MF. Sale al crear un Blob Store en Vercel.
 
 **3. Crea las tablas en la base de datos:**
 
@@ -61,8 +62,9 @@ Abre <http://localhost:5173> y entra con tu usuario y PIN. Desde **Personas** cr
 
 1. En Vercel: **Add New → Project** e importa este repositorio. Vercel detecta Vite solo.
 2. En **Settings → Environment Variables** agrega `DATABASE_URL` y `SESSION_SECRET` (los mismos de tu `.env`, o unos propios de producción).
-3. En **Settings → Functions** elige la región más cercana a tu VPS.
-4. Cada vez que se sube un cambio a `main`, Vercel publica solo.
+3. En **Storage** crea un **Blob Store** y conéctalo al proyecto: Vercel agrega solo `BLOB_READ_WRITE_TOKEN` (fotos y archivos de los productos).
+4. En **Settings → Functions** elige la región más cercana a tu VPS.
+5. Cada vez que se sube un cambio a `main`, Vercel publica solo.
 
 ## Base de datos en el VPS (recomendado)
 
@@ -72,14 +74,15 @@ Abre <http://localhost:5173> y entra con tu usuario y PIN. Desde **Personas** cr
 
 ## Comandos útiles
 
-| Comando                                       | Para qué                                                          |
-| --------------------------------------------- | ----------------------------------------------------------------- |
-| `pnpm dev`                                    | Arranca el sistema en tu equipo (pantalla + API)                  |
-| `pnpm build`                                  | Revisa tipos y arma la versión de producción                      |
-| `pnpm lint`                                   | Revisa el código                                                  |
-| `pnpm db:generar`                             | Crea una migración nueva después de cambiar `server/db/schema.ts` |
-| `pnpm db:migrar`                              | Aplica las migraciones pendientes a la base de datos              |
-| `pnpm crear-admin <usuario> "<Nombre>" <PIN>` | Crea un administrador o le cambia el PIN                          |
+| Comando                                       | Para qué                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `pnpm dev`                                    | Arranca el sistema en tu equipo (pantalla + API)                   |
+| `pnpm dev:prueba`                             | Arranca la versión de prueba (sin base de datos, datos de ejemplo) |
+| `pnpm build`                                  | Revisa tipos y arma la versión de producción                       |
+| `pnpm lint`                                   | Revisa el código                                                   |
+| `pnpm db:generar`                             | Crea una migración nueva después de cambiar `server/db/schema.ts`  |
+| `pnpm db:migrar`                              | Aplica las migraciones pendientes a la base de datos               |
+| `pnpm crear-admin <usuario> "<Nombre>" <PIN>` | Crea un administrador o le cambia el PIN                           |
 
 ## Estructura
 
@@ -87,7 +90,7 @@ Abre <http://localhost:5173> y entra con tu usuario y PIN. Desde **Personas** cr
 api/            Función de Vercel (entrada de la API)
 server/         Rutas de la API, sesión, base de datos
   db/           Esquema y migraciones
-  rutas/        auth, usuarios, configuracion
+  rutas/        auth, usuarios, configuracion, taller
 shared/         Código que usan la pantalla y el servidor (roles, configuración)
 scripts/        crear-admin
 src/            Pantalla (React)

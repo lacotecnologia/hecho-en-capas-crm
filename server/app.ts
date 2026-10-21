@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { getDb } from './db/index.js'
 import { rutasAuth } from './rutas/auth.js'
 import { rutasConfiguracion } from './rutas/configuracion.js'
+import { rutasTaller } from './rutas/taller.js'
 import { rutasUsuarios } from './rutas/usuarios.js'
 import { type Variables } from './sesion.js'
 
@@ -25,6 +26,7 @@ app.get('/salud', async (c) => {
 app.route('/auth', rutasAuth)
 app.route('/usuarios', rutasUsuarios)
 app.route('/configuracion', rutasConfiguracion)
+app.route('/taller', rutasTaller)
 
 app.notFound((c) => c.json({ mensaje: 'Esta dirección no existe.' }, 404))
 

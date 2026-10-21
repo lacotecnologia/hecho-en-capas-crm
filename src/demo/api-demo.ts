@@ -12,6 +12,7 @@ import {
 } from '@shared/configuracion'
 import { esRol, type Rol } from '@shared/roles'
 import { ApiError } from '@/lib/api'
+import { atenderTaller, tallerInicial, type TallerDemo } from './taller-demo'
 
 type PersonaDemo = {
   id: number
@@ -29,9 +30,10 @@ type EstadoDemo = {
   personas: PersonaDemo[]
   config: ValoresConfig
   sesion: number | null
+  taller: TallerDemo
 }
 
-const CLAVE = 'hec-demo-v1'
+const CLAVE = 'hec-demo-v2'
 const MAX_INTENTOS = 5
 const MINUTOS_BLOQUEO = 15
 
@@ -62,6 +64,7 @@ function inicial(): EstadoDemo {
     ],
     config: valoresPorDefecto(),
     sesion: null,
+    taller: tallerInicial(valoresPorDefecto()),
   }
 }
 
@@ -330,6 +333,20 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
       p.bloqueadoHasta = null
     }
     return { usuario: publica(p) }
+  }
+
+  // ---- Taller ----
+  if (ruta.startsWith('/taller/')) {
+    const persona = yo(estado)
+    const respuesta = atenderTaller(
+      estado.taller,
+      estado.config,
+      persona.roles,
+      ruta,
+      metodo,
+      c
+    )
+    if (respuesta !== undefined) return respuesta
   }
 
   return fallo(404, 'Esta dirección no existe.')
