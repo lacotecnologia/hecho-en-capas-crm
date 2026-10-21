@@ -1,0 +1,132 @@
+/*
+ * Colores de Hecho en Capas (tomados del logo)
+ *   Verde Capas  #007A52  -> botones principales, menú activo, "Entregado"
+ *   Ámbar "en"   #F9AE12  -> resaltados y estados en proceso
+ *   Verde lima   #A8CC40  -> "Listo" y confirmaciones suaves
+ *   Amarillo     #FED032  -> avisos
+ *   Naranja      #FA9A05  -> pendiente de pago o de acción
+ */
+:root {
+  --radius: 0.75rem;
+  --background: #ffffff;
+  --foreground: #1c1917;
+  --card: #ffffff;
+  --card-foreground: #1c1917;
+  --popover: #ffffff;
+  --popover-foreground: #1c1917;
+  --primary: #007a52;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f4;
+  --secondary-foreground: #1c1917;
+  --muted: #f5f5f4;
+  --muted-foreground: #6b6560;
+  --accent: #eef6f1;
+  --accent-foreground: #0b3d2a;
+  --destructive: #dc2626;
+  --border: #e7e5e4;
+  --input: #d6d3d1;
+  --ring: #007a52;
+
+  --marca-verde: #007a52;
+  --marca-ambar: #f9ae12;
+  --marca-lima: #a8cc40;
+  --marca-amarillo: #fed032;
+  --marca-naranja: #fa9a05;
+
+  --chart-1: #007a52;
+  --chart-2: #f9ae12;
+  --chart-3: #a8cc40;
+  --chart-4: #fa9a05;
+  --chart-5: #fed032;
+
+  --sidebar: #fafaf9;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
+.dark {
+  --background: #121212;
+  --foreground: #f5f5f4;
+  --card: #1a1a1a;
+  --card-foreground: #f5f5f4;
+  --popover: #1f1f1f;
+  --popover-foreground: #f5f5f4;
+  --primary: #2fb37f;
+  --primary-foreground: #04140d;
+  --secondary: #262626;
+  --secondary-foreground: #f5f5f4;
+  --muted: #262626;
+  --muted-foreground: #a8a29e;
+  --accent: #16332a;
+  --accent-foreground: #d7f5e7;
+  --destructive: #f87171;
+  --border: #2e2e2e;
+  --input: #3a3a3a;
+  --ring: #2fb37f;
+
+  --marca-verde: #2fb37f;
+  --marca-ambar: #f9ae12;
+  --marca-lima: #b8d85a;
+  --marca-amarillo: #fed032;
+  --marca-naranja: #fba10a;
+
+  --chart-1: #2fb37f;
+  --chart-2: #f9ae12;
+  --chart-3: #b8d85a;
+  --chart-4: #fa9a05;
+  --chart-5: #fed032;
+
+  --sidebar: #161616;
+}
+
+@theme inline {
+  --font-inter: 'Inter', 'sans-serif';
+  --font-titulos: 'Poppins', 'Inter', 'sans-serif';
+  --font-manrope: 'Manrope', 'sans-serif';
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-marca-verde: var(--marca-verde);
+  --color-marca-ambar: var(--marca-ambar);
+  --color-marca-lima: var(--marca-lima);
+  --color-marca-amarillo: var(--marca-amarillo);
+  --color-marca-naranja: var(--marca-naranja);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
