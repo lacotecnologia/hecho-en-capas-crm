@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Laptop, Moon, Sun } from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
 import { useSesion } from '@/lib/sesion'
 import { useSearch } from '@/context/search-provider'
 import { useTheme } from '@/context/theme-provider'
@@ -65,10 +65,6 @@ export function CommandMenu() {
             <CommandItem onSelect={() => ejecutar(() => setTheme('dark'))}>
               <Moon className='scale-90' />
               <span>Modo oscuro</span>
-            </CommandItem>
-            <CommandItem onSelect={() => ejecutar(() => setTheme('system'))}>
-              <Laptop />
-              <span>Igual que el equipo</span>
             </CommandItem>
           </CommandGroup>
         </ScrollArea>

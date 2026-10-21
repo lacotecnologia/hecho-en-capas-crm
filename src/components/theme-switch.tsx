@@ -1,58 +1,38 @@
 import { useEffect } from 'react'
-import { Check, Moon, Sun } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Moon, Sun } from 'lucide-react'
 import { useTheme } from '@/context/theme-provider'
 import { Button } from '@/components/ui/button'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
+/** Un solo botón: alterna entre modo claro (por defecto) y modo oscuro. */
 export function ThemeSwitch() {
-  const { theme, setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
+  const oscuro = resolvedTheme === 'dark'
+  const texto = oscuro ? 'Pasar a modo claro' : 'Pasar a modo oscuro'
 
-  /* Update theme-color meta tag
-   * when theme is updated */
   useEffect(() => {
-    const themeColor = theme === 'dark' ? '#121212' : '#ffffff'
-    const metaThemeColor = document.querySelector("meta[name='theme-color']")
-    if (metaThemeColor) metaThemeColor.setAttribute('content', themeColor)
-  }, [theme])
+    const meta = document.querySelector("meta[name='theme-color']")
+    if (meta) meta.setAttribute('content', oscuro ? '#121212' : '#ffffff')
+  }, [oscuro])
 
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <Button variant='ghost' size='icon' className='scale-95 rounded-full'>
-          <Sun className='size-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90' />
-          <Moon className='absolute size-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0' />
-          <span className='sr-only'>Cambiar entre modo claro y oscuro</span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant='ghost'
+          size='icon'
+          className='rounded-full'
+          onClick={() => setTheme(oscuro ? 'light' : 'dark')}
+          aria-label={texto}
+        >
+          {oscuro ? <Sun className='size-5' /> : <Moon className='size-5' />}
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align='end'>
-        <DropdownMenuItem onClick={() => setTheme('light')}>
-          Modo claro{' '}
-          <Check
-            size={14}
-            className={cn('ms-auto', theme !== 'light' && 'hidden')}
-          />
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('dark')}>
-          Modo oscuro
-          <Check
-            size={14}
-            className={cn('ms-auto', theme !== 'dark' && 'hidden')}
-          />
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('system')}>
-          Igual que el equipo
-          <Check
-            size={14}
-            className={cn('ms-auto', theme !== 'system' && 'hidden')}
-          />
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </TooltipTrigger>
+      <TooltipContent>{texto}</TooltipContent>
+    </Tooltip>
   )
 }
