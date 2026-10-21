@@ -37,3 +37,7 @@ Sistema interno (familiar) para cotizaciones, pedidos, taller, cobros y entregas
 ## Verificar antes de subir
 
 `pnpm build` (tipos + build) y `pnpm lint` deben pasar sin errores.
+
+## Mostrar el resultado
+
+Luis quiere ver el resultado visual de cada avance: al terminar, enviar capturas de las pantallas nuevas o cambiadas (computador y celular). Para capturas limpias, arrancar con `npx vite --mode captura` (así no salen las herramientas de desarrollo).
