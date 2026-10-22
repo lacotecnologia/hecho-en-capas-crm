@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { MODALIDADES_INFO } from '@shared/cotizacion'
@@ -23,11 +23,14 @@ import {
   Lock,
   Package,
   Printer,
+  ImagePlus,
+  Undo2,
   Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ApiError, mensajeDeError } from '@/lib/api'
 import { tieneRol, useSesion } from '@/lib/sesion'
+import { subirFoto } from '@/lib/subir-foto'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -53,10 +56,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { Campo, CampoNumero } from '@/components/campo'
 import { Pagina } from '@/components/layout/pagina'
 import { formatoFecha, formatoFechaLarga } from '@/features/cotizar/estado'
+import {
+  AccionesEntrega,
+  DatosEntrega,
+  enlaceWhatsapp,
+  EstadoEntregaBadge,
+} from '@/features/entregas/entrega'
 import { formatoPesos } from '@/features/taller/formato'
 import {
   agregarNota,
   cancelarPedido,
+  devolverPlata,
+  guardarFactura,
   consultaPedido,
   producirSinAnticipo,
   registrarPago,
@@ -104,6 +115,8 @@ function Ficha({ p }: { p: PedidoDetalle }) {
   const verDinero = tieneRol(usuario, ['admin', 'comercial'])
   const [pagando, setPagando] = useState(false)
   const [cancelando, setCancelando] = useState(false)
+  const [devolviendo, setDevolviendo] = useState(false)
+  const verSaldo = tieneRol(usuario, ['admin', 'comercial', 'entregas'])
 
   const poner = (d: PedidoDetalle) => {
     queryClient.setQueryData(['pedido', d.id], { pedido: d })
@@ -122,7 +135,14 @@ function Ficha({ p }: { p: PedidoDetalle }) {
 
   const falta = p.total - p.pagado
   const anticipoFalta = anticipoPendiente(p)
-  const compromiso = textoCompromiso(p.fechaCompromiso)
+  const compromiso = [
+    'confirmado',
+    'en_produccion',
+    'listo',
+    'en_entrega',
+  ].includes(p.estado)
+    ? textoCompromiso(p.fechaCompromiso)
+    : null
   const cancelado = p.estado === 'cancelado'
   const pasoActual = PASOS_PEDIDO.findIndex((x) => x.estado === p.estado)
 
@@ -305,6 +325,34 @@ function Ficha({ p }: { p: PedidoDetalle }) {
             </CardContent>
           </Card>
 
+          {!cancelado && p.entrega && (
+            <Card>
+              <CardHeader className='flex flex-row flex-wrap items-start justify-between gap-2'>
+                <div className='grid gap-1'>
+                  <CardTitle className='text-lg'>Entrega</CardTitle>
+                  <CardDescription>
+                    {MODALIDADES_INFO[p.modalidad].nombre}
+                  </CardDescription>
+                </div>
+                <EstadoEntregaBadge e={p.entrega} />
+              </CardHeader>
+              <CardContent className='grid gap-4'>
+                <DatosEntrega e={p.entrega} saldo={verSaldo ? falta : 0} />
+                <AccionesEntrega
+                  e={p.entrega}
+                  saldo={verSaldo ? falta : 0}
+                  listo={[
+                    'listo',
+                    'en_entrega',
+                    'entregado',
+                    'cerrado',
+                  ].includes(p.estado)}
+                  puedeProgramar={cobra}
+                />
+              </CardContent>
+            </Card>
+          )}
+
           <Notas p={p} onCambio={poner} />
           <Historial p={p} />
         </div>
@@ -352,11 +400,29 @@ function Ficha({ p }: { p: PedidoDetalle }) {
                           {METODOS_PAGO_INFO[x.metodo]}
                           <span className='block text-xs text-muted-foreground'>
                             {formatoFecha(x.creadoEn)} · {x.usuario}
-                            {x.referencia && ` · ref. ${x.referencia}`}
+                            {x.referencia && ` · ${x.referencia}`}
+                            {x.nota && ` · ${x.nota}`}
                           </span>
+                          {x.comprobanteUrl && (
+                            <a
+                              href={x.comprobanteUrl}
+                              target='_blank'
+                              rel='noreferrer'
+                              className='text-xs text-primary underline'
+                            >
+                              Ver comprobante
+                            </a>
+                          )}
                         </span>
-                        <span className='font-medium tabular-nums'>
-                          {formatoPesos(x.monto)}
+                        <span
+                          className={cn(
+                            'font-medium tabular-nums',
+                            x.monto < 0 && 'text-destructive'
+                          )}
+                        >
+                          {x.monto < 0
+                            ? `− ${formatoPesos(-x.monto)}`
+                            : formatoPesos(x.monto)}
                         </span>
                       </li>
                     ))}
@@ -370,6 +436,16 @@ function Ficha({ p }: { p: PedidoDetalle }) {
                       <Wallet /> Registrar un pago
                     </Button>
                   )}
+                {esAdmin && p.pagado > 0 && (
+                  <Button
+                    variant='ghost'
+                    className='text-muted-foreground'
+                    onClick={() => setDevolviendo(true)}
+                  >
+                    <Undo2 /> Devolver plata al cliente
+                  </Button>
+                )}
+                <Factura p={p} puede={cobra} onCambio={poner} />
                 <p className='flex items-center justify-between rounded-lg border border-dashed border-primary/40 p-3 text-sm'>
                   <span>
                     Tu ganancia
@@ -410,12 +486,18 @@ function Ficha({ p }: { p: PedidoDetalle }) {
                 )}
               </div>
               <div>
-                <p className='text-muted-foreground'>Entrega</p>
-                <p className='font-medium'>
-                  {MODALIDADES_INFO[p.modalidad].nombre}
-                </p>
-                {p.cliente.direccion && <p>{p.cliente.direccion}</p>}
-                {p.cliente.whatsapp && <p>WhatsApp {p.cliente.whatsapp}</p>}
+                <p className='text-muted-foreground'>Cliente</p>
+                <p className='font-medium'>{p.cliente.nombre}</p>
+                {p.cliente.whatsapp && (
+                  <a
+                    href={enlaceWhatsapp(p.cliente.whatsapp)}
+                    target='_blank'
+                    rel='noreferrer'
+                    className='text-primary'
+                  >
+                    WhatsApp {p.cliente.whatsapp}
+                  </a>
+                )}
               </div>
               <div>
                 <p className='text-muted-foreground'>Código de seguimiento</p>
@@ -477,6 +559,15 @@ function Ficha({ p }: { p: PedidoDetalle }) {
           setPagando(false)
         }}
       />
+      <DialogoDevolver
+        abierto={devolviendo}
+        p={p}
+        onCerrar={() => setDevolviendo(false)}
+        onListo={(d) => {
+          poner(d)
+          setDevolviendo(false)
+        }}
+      />
       <DialogoCancelar
         abierto={cancelando}
         p={p}
@@ -524,13 +615,21 @@ function FormPago({
   const [monto, setMonto] = useState(String(anticipo || falta))
   const [metodo, setMetodo] = useState<MetodoPago | ''>('')
   const [referencia, setReferencia] = useState('')
+  const [comprobante, setComprobante] = useState<string | null>(null)
+  const [subiendo, setSubiendo] = useState(false)
+  const entradaFoto = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<{
     mensaje: string
     campo?: string
   } | null>(null)
   const guardar = useMutation({
     mutationFn: () =>
-      registrarPago(p.id, { monto: Number(monto) || 0, metodo, referencia }),
+      registrarPago(p.id, {
+        monto: Number(monto) || 0,
+        metodo,
+        referencia,
+        comprobanteUrl: comprobante,
+      }),
     onSuccess: ({ pedido }) => {
       toast.success(
         pedido.estado !== p.estado && pedido.estado === 'en_produccion'
@@ -633,6 +732,53 @@ function FormPago({
           />
         )}
       </Campo>
+      <div className='grid gap-2'>
+        <input
+          ref={entradaFoto}
+          type='file'
+          accept='image/*'
+          className='hidden'
+          onChange={async (e) => {
+            const a = e.target.files?.[0]
+            if (!a) return
+            setSubiendo(true)
+            try {
+              setComprobante(
+                await subirFoto(a, {
+                  permiso: '/api/pedidos/subida',
+                  carpeta: `pagos/${p.id}`,
+                })
+              )
+            } catch (err) {
+              toast.error(mensajeDeError(err))
+            } finally {
+              setSubiendo(false)
+            }
+          }}
+        />
+        {comprobante && (
+          <img
+            src={comprobante}
+            alt='Comprobante'
+            className='max-h-40 justify-self-start rounded-lg border object-contain'
+          />
+        )}
+        <Button
+          type='button'
+          variant='outline'
+          className='justify-self-start'
+          disabled={subiendo}
+          onClick={() => entradaFoto.current?.click()}
+        >
+          {subiendo ? <Loader2 className='animate-spin' /> : <ImagePlus />}
+          {comprobante
+            ? 'Cambiar foto del comprobante'
+            : 'Foto del comprobante (opcional)'}
+        </Button>
+      </div>
+      {error?.campo === 'comprobanteUrl' && (
+        <p className='text-sm font-medium text-destructive'>{error.mensaje}</p>
+      )}
       {error && !error.campo && (
         <p className='text-sm font-medium text-destructive'>{error.mensaje}</p>
       )}
@@ -640,7 +786,7 @@ function FormPago({
         <Button type='button' variant='outline' onClick={onCerrar}>
           Cancelar
         </Button>
-        <Button type='submit' disabled={guardar.isPending}>
+        <Button type='submit' disabled={guardar.isPending || subiendo}>
           {guardar.isPending ? (
             <Loader2 className='animate-spin' />
           ) : (
@@ -835,5 +981,197 @@ function Historial({ p }: { p: PedidoDetalle }) {
         </ol>
       </CardContent>
     </Card>
+  )
+}
+
+function Factura({
+  p,
+  puede,
+  onCambio,
+}: {
+  p: PedidoDetalle
+  puede: boolean
+  onCambio: (p: PedidoDetalle) => void
+}) {
+  const [valor, setValor] = useState(p.numeroFactura)
+  const guardar = useMutation({
+    mutationFn: () => guardarFactura(p.id, valor),
+    onSuccess: ({ pedido }) => {
+      onCambio(pedido)
+      toast.success(
+        valor ? 'Número de factura guardado.' : 'Se quitó el número de factura.'
+      )
+    },
+    onError: (e) => toast.error(mensajeDeError(e)),
+  })
+  if (!puede) {
+    return p.numeroFactura ? (
+      <p className='text-sm text-muted-foreground'>
+        Factura: {p.numeroFactura}
+      </p>
+    ) : null
+  }
+  return (
+    <form
+      className='grid gap-1.5 border-t pt-3'
+      onSubmit={(e) => {
+        e.preventDefault()
+        guardar.mutate()
+      }}
+    >
+      <Label htmlFor='factura'>Número de factura</Label>
+      <div className='flex gap-2'>
+        <Input
+          id='factura'
+          value={valor}
+          placeholder='Opcional'
+          onChange={(e) => setValor(e.target.value)}
+        />
+        <Button
+          type='submit'
+          variant='outline'
+          disabled={guardar.isPending || valor === p.numeroFactura}
+        >
+          Guardar
+        </Button>
+      </div>
+      <p className='text-xs text-muted-foreground'>
+        Si emites factura electrónica por otro medio, anota aquí su número.
+      </p>
+    </form>
+  )
+}
+
+function DialogoDevolver({
+  abierto,
+  p,
+  onCerrar,
+  onListo,
+}: {
+  abierto: boolean
+  p: PedidoDetalle
+  onCerrar: () => void
+  onListo: (p: PedidoDetalle) => void
+}) {
+  return (
+    <Dialog open={abierto} onOpenChange={(v) => !v && onCerrar()}>
+      <DialogContent className='sm:max-w-md'>
+        {abierto && (
+          <FormDevolver p={p} onCerrar={onCerrar} onListo={onListo} />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function FormDevolver({
+  p,
+  onCerrar,
+  onListo,
+}: {
+  p: PedidoDetalle
+  onCerrar: () => void
+  onListo: (p: PedidoDetalle) => void
+}) {
+  const cancelado = p.estado === 'cancelado'
+  const [monto, setMonto] = useState(cancelado ? String(p.pagado) : '')
+  const [metodo, setMetodo] = useState<MetodoPago | ''>('')
+  const [motivo, setMotivo] = useState(cancelado ? 'Se canceló el pedido' : '')
+  const [error, setError] = useState<{
+    mensaje: string
+    campo?: string
+  } | null>(null)
+  const guardar = useMutation({
+    mutationFn: () =>
+      devolverPlata(p.id, { monto: Number(monto) || 0, metodo, motivo }),
+    onSuccess: ({ pedido }) => {
+      toast.success('Devolución registrada.')
+      onListo(pedido)
+    },
+    onError: (e) =>
+      setError(
+        e instanceof ApiError
+          ? { mensaje: e.message, campo: e.campo }
+          : { mensaje: mensajeDeError(e) }
+      ),
+  })
+  return (
+    <form
+      className='grid gap-4'
+      onSubmit={(e) => {
+        e.preventDefault()
+        setError(null)
+        guardar.mutate()
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>Devolver plata al cliente</DialogTitle>
+        <DialogDescription>
+          El cliente ha pagado {formatoPesos(p.pagado)}.
+          {cancelado
+            ? ' Como el pedido se canceló, normalmente se le devuelve todo.'
+            : ' En un pedido que sigue, la devolución también baja el total del pedido (como un descuento).'}
+        </DialogDescription>
+      </DialogHeader>
+      <CampoNumero
+        etiqueta='¿Cuánto se le devuelve?'
+        unidad='COP'
+        valor={monto}
+        onChange={setMonto}
+        error={error?.campo === 'monto' ? error.mensaje : undefined}
+      />
+      <fieldset className='grid gap-1.5'>
+        <legend className='mb-1.5 text-sm font-medium'>
+          ¿Cómo se le devuelve?
+        </legend>
+        <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
+          {METODOS_PAGO.map((m) => (
+            <button
+              key={m}
+              type='button'
+              aria-pressed={metodo === m}
+              onClick={() => setMetodo(m)}
+              className={cn(
+                'rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors',
+                metodo === m
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'hover:bg-accent'
+              )}
+            >
+              {METODOS_PAGO_INFO[m]}
+            </button>
+          ))}
+        </div>
+        {error?.campo === 'metodo' && (
+          <p className='text-sm font-medium text-destructive'>
+            {error.mensaje}
+          </p>
+        )}
+      </fieldset>
+      <Campo
+        etiqueta='¿Por qué?'
+        error={error?.campo === 'motivo' ? error.mensaje : undefined}
+      >
+        {(id) => (
+          <Textarea
+            id={id}
+            rows={2}
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+          />
+        )}
+      </Campo>
+      {error && !error.campo && (
+        <p className='text-sm font-medium text-destructive'>{error.mensaje}</p>
+      )}
+      <DialogFooter>
+        <Button type='button' variant='outline' onClick={onCerrar}>
+          Cancelar
+        </Button>
+        <Button type='submit' disabled={guardar.isPending}>
+          <Undo2 /> Registrar devolución
+        </Button>
+      </DialogFooter>
+    </form>
   )
 }

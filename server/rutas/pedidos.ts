@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, max, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { sumarDiasHabiles } from '../../shared/cotizacion.js'
+import { estadoPago, validarReembolso } from '../../shared/entregas.js'
 import {
   codigoPedido,
   codigoSeguimiento,
@@ -33,8 +34,16 @@ import {
   productos,
   usuarios,
 } from '../db/schema.js'
-import { anotar, recalcularPedido, totalPagado, type Tx } from '../pedidos-logica.js'
+import {
+  anotar,
+  crearEntrega,
+  leerEntrega,
+  recalcularPedido,
+  totalPagado,
+  type Tx,
+} from '../pedidos-logica.js'
 import { conSesion, soloRoles, type UsuarioSesion, type Variables } from '../sesion.js'
+import { permisoDeSubida, SOLO_IMAGENES, urlDeBlobValida } from '../subidas.js'
 
 export const rutasPedidos = new Hono<{ Variables: Variables }>()
 
@@ -110,6 +119,8 @@ async function detalle(id: number, u: UsuarioSesion): Promise<PedidoDetalle | nu
       metodo: pagos.metodo,
       monto: pagos.monto,
       referencia: pagos.referencia,
+      comprobanteUrl: pagos.comprobanteUrl,
+      nota: pagos.nota,
       usuario: usuarios.nombre,
       creadoEn: pagos.creadoEn,
     })
@@ -147,6 +158,7 @@ async function detalle(id: number, u: UsuarioSesion): Promise<PedidoDetalle | nu
   }))
   const pagado = listaPagos.reduce((s, x) => s + x.monto, 0)
   const dinero = veDinero(u)
+  const entrega = await db.transaction((tx) => leerEntrega(tx, id))
   return {
     id: p.id,
     codigo: p.codigo,
@@ -162,13 +174,15 @@ async function detalle(id: number, u: UsuarioSesion): Promise<PedidoDetalle | nu
     comercial: comercial ?? { id: p.comercialId, nombre: '—' },
     cotizacion: cot,
     total: p.total,
-    pagado: dinero ? pagado : 0,
+    // El mensajero necesita saber cuánto cobrar al entregar
+    pagado: dinero || u.roles.includes('entregas') ? pagado : 0,
     avance: {
       listas: lineasOut.filter((l) => l.estado === 'listo').length,
       total: lineasOut.length,
     },
     fechaCompromiso: p.fechaCompromiso?.toISOString() ?? null,
     creadoEn: p.creadoEn.toISOString(),
+    estadoPago: estadoPago({ ...p, pagado, cancelado: p.estado === 'cancelado' }),
     modalidad: p.modalidad as PedidoDetalle['modalidad'],
     lineas: lineasOut,
     cargos,
@@ -183,6 +197,8 @@ async function detalle(id: number, u: UsuarioSesion): Promise<PedidoDetalle | nu
     diasEnvio: p.diasEnvio,
     notas: p.notas,
     motivoCancelacion: p.motivoCancelacion,
+    numeroFactura: p.numeroFactura,
+    entrega,
     pagos: dinero
       ? listaPagos.map((x) => ({
           id: x.id,
@@ -190,6 +206,8 @@ async function detalle(id: number, u: UsuarioSesion): Promise<PedidoDetalle | nu
           metodo: x.metodo as MetodoPago,
           monto: x.monto,
           referencia: x.referencia,
+          comprobanteUrl: x.comprobanteUrl,
+          nota: x.nota,
           usuario: x.usuario ?? '—',
           creadoEn: x.creadoEn.toISOString(),
         }))
@@ -245,6 +263,7 @@ rutasPedidos.get('/', ve, async (c) => {
       avance: { listas, total: lineas },
       fechaCompromiso: p.fechaCompromiso?.toISOString() ?? null,
       creadoEn: p.creadoEn.toISOString(),
+      estadoPago: estadoPago({ ...p, pagado, cancelado: p.estado === 'cancelado' }),
     }))
   return c.json({ pedidos: lista })
 })
@@ -393,6 +412,7 @@ rutasPedidos.post('/', vende, async (c) => {
         .insert(pedidoCargos)
         .values(cargos.map((g) => ({ pedidoId: nuevo.id, concepto: g.concepto, valor: g.valor })))
     }
+    await crearEntrega(tx, nuevo.id)
     await anotar(tx, {
       entidad: 'pedido',
       entidadId: nuevo.id,
@@ -431,7 +451,17 @@ rutasPedidos.post('/:id/pagos', vende, async (c) => {
       pagadoAntes,
       monto: v.datos.monto,
     })
-    await tx.insert(pagos).values({ pedidoId: p.id, tipo, ...v.datos, usuarioId: u.id })
+    const comprobante = String(cuerpo.comprobanteUrl ?? '')
+    if (comprobante && !urlDeBlobValida(comprobante)) {
+      return { ok: false as const, mensaje: 'La foto del comprobante no se subió bien. Intenta de nuevo.', campo: 'comprobanteUrl' }
+    }
+    await tx.insert(pagos).values({
+      pedidoId: p.id,
+      tipo,
+      ...v.datos,
+      comprobanteUrl: comprobante || null,
+      usuarioId: u.id,
+    })
     await anotar(tx, {
       entidad: 'pedido',
       entidadId: p.id,
@@ -560,3 +590,60 @@ rutasPedidos.post('/:id/notas', ve, async (c) => {
   )
   return c.json(await responder(p.id, u), 201)
 })
+
+// ===================== Devoluciones, factura y comprobantes =====================
+
+/** Devolverle plata al cliente: solo el Admin. Se guarda como pago negativo. */
+rutasPedidos.post('/:id/reembolso', soloRoles('admin'), async (c) => {
+  const u = c.get('usuario')
+  const p = await cargar(Number(c.req.param('id')) || 0, u)
+  if (!p) return c.json({ mensaje: NO_EXISTE }, 404)
+  const cuerpo = await c.req.json().catch(() => ({}))
+  const r = await getDb().transaction(async (tx) => {
+    await tx.select({ id: pedidos.id }).from(pedidos).where(eq(pedidos.id, p.id)).for('update')
+    const v = validarReembolso(cuerpo, await totalPagado(tx, p.id))
+    if (!v.ok) return v
+    await tx.insert(pagos).values({
+      pedidoId: p.id,
+      tipo: 'reembolso',
+      metodo: v.datos.metodo,
+      monto: -v.datos.monto,
+      nota: v.datos.motivo,
+      usuarioId: u.id,
+    })
+    // En un pedido que sigue, la devolución es un descuento: baja el total
+    if (p.estado !== 'cancelado') {
+      await tx
+        .update(pedidos)
+        .set({ total: sql`${pedidos.total} - ${v.datos.monto}`, actualizadoEn: new Date() })
+        .where(eq(pedidos.id, p.id))
+    }
+    await anotar(tx, {
+      entidad: 'pedido',
+      entidadId: p.id,
+      nota: `Pago devuelto al cliente: $ ${v.datos.monto.toLocaleString('es-CO')} — ${v.datos.motivo}`,
+      usuarioId: u.id,
+    })
+    await recalcularPedido(tx, p.id, u.id)
+    return { ok: true as const }
+  })
+  if (!r.ok) return c.json({ mensaje: r.mensaje, campo: r.campo }, 400)
+  return c.json(await responder(p.id, u), 201)
+})
+
+/** Número de la factura, si se emitió por otro medio. */
+rutasPedidos.patch('/:id/factura', vende, async (c) => {
+  const u = c.get('usuario')
+  const p = await cargar(Number(c.req.param('id')) || 0, u)
+  if (!p) return c.json({ mensaje: NO_EXISTE }, 404)
+  if (!puedeCobrar(u, p)) return c.json({ mensaje: 'Este pedido es de otro comercial.' }, 403)
+  const cuerpo = await c.req.json().catch(() => ({}))
+  const numero = String(cuerpo.numeroFactura ?? '').trim().slice(0, 40)
+  await getDb()
+    .update(pedidos)
+    .set({ numeroFactura: numero, actualizadoEn: new Date() })
+    .where(eq(pedidos.id, p.id))
+  return c.json(await responder(p.id, u))
+})
+
+rutasPedidos.post('/subida', vende, (c) => permisoDeSubida(c, SOLO_IMAGENES))

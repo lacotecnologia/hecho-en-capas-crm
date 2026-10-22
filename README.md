@@ -9,14 +9,14 @@ Sistema interno para llevar cotizaciones, pedidos, taller (fabricación), cobros
 
 ## Estado
 
-| Fase                 | Qué incluye                                                    | Estado    |
-| -------------------- | -------------------------------------------------------------- | --------- |
-| 1. Base              | Login con usuario + PIN, roles, Personas, Configuración, marca | ✅ Lista  |
-| 2. Taller I          | Impresoras, bobinas, catálogo y precio de fábrica              | ✅ Lista  |
-| 3. Cotizar           | Clientes, cotizador con cálculos, PDF, versiones y respuestas  | ✅ Lista  |
-| 4. Pedidos           | Pedidos, anticipo y cola de impresión por impresora            | ✅ Lista  |
-| 5. Cobros y Entregas | Pagos, saldos, domicilios y envíos                             | Pendiente |
-| 6. Seguimiento       | Página pública para el cliente y reportes                      | Pendiente |
+| Fase                 | Qué incluye                                                         | Estado    |
+| -------------------- | ------------------------------------------------------------------- | --------- |
+| 1. Base              | Login con usuario + PIN, roles, Personas, Configuración, marca      | ✅ Lista  |
+| 2. Taller I          | Impresoras, bobinas, catálogo y precio de fábrica                   | ✅ Lista  |
+| 3. Cotizar           | Clientes, cotizador con cálculos, PDF, versiones y respuestas       | ✅ Lista  |
+| 4. Pedidos           | Pedidos, anticipo y cola de impresión por impresora                 | ✅ Lista  |
+| 5. Cobros y Entregas | Pagos con comprobante, devoluciones, entregas y vista del mensajero | ✅ Lista  |
+| 6. Seguimiento       | Página pública para el cliente y reportes                           | Pendiente |
 
 ## Poner a andar en tu Mac (paso a paso)
 

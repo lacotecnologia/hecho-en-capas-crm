@@ -3,9 +3,11 @@ import { sql } from 'drizzle-orm'
 import { getDb } from './db/index.js'
 import { rutasAuth } from './rutas/auth.js'
 import { rutasClientes } from './rutas/clientes.js'
+import { rutasCobros } from './rutas/cobros.js'
 import { rutasCola } from './rutas/cola.js'
 import { rutasConfiguracion } from './rutas/configuracion.js'
 import { rutasCotizaciones } from './rutas/cotizaciones.js'
+import { rutasEntregas } from './rutas/entregas.js'
 import { rutasPedidos } from './rutas/pedidos.js'
 import { rutasTaller } from './rutas/taller.js'
 import { rutasUsuarios } from './rutas/usuarios.js'
@@ -35,6 +37,8 @@ app.route('/clientes', rutasClientes)
 app.route('/cotizaciones', rutasCotizaciones)
 app.route('/pedidos', rutasPedidos)
 app.route('/cola', rutasCola)
+app.route('/entregas', rutasEntregas)
+app.route('/cobros', rutasCobros)
 
 app.notFound((c) => c.json({ mensaje: 'Esta dirección no existe.' }, 404))
 

@@ -4,6 +4,7 @@
  */
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { sumarDiasHabiles } from '../shared/cotizacion.js'
+import { costoEnvioCobrado, type Entrega, type EstadoEntrega } from '../shared/entregas.js'
 import {
   calcularEstadoPedido,
   type EstadoOrden,
@@ -12,11 +13,15 @@ import {
 } from '../shared/pedidos.js'
 import { type getDb } from './db/index.js'
 import {
+  clientes,
+  entregas,
   historialEstados,
   ordenesProduccion,
   pagos,
+  pedidoCargos,
   pedidoLineas,
   pedidos,
+  usuarios,
 } from './db/schema.js'
 
 export type Tx = Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0]
@@ -112,11 +117,17 @@ export async function recalcularPedido(tx: Tx, pedidoId: number, usuarioId: numb
   }
 
   const estados = await estadosDeLineas(tx, pedidoId)
+  const [ent] = await tx
+    .select({ estado: entregas.estado })
+    .from(entregas)
+    .where(eq(entregas.pedidoId, pedidoId))
   const estado: EstadoPedido = calcularEstadoPedido({
     ...base,
     cancelado: p.estado === 'cancelado',
     total: p.total,
     estadosLineas: [...estados.values()],
+    enEntrega: ent?.estado === 'programada' || ent?.estado === 'en_camino',
+    entregado: ent?.estado === 'entregada',
   })
   if (estado !== p.estado) {
     cambios.estado = estado
@@ -136,4 +147,66 @@ export async function recalcularPedido(tx: Tx, pedidoId: number, usuarioId: numb
       .where(eq(pedidos.id, pedidoId))
   }
   return estado
+}
+
+/** Crea la entrega del pedido con los datos del cliente (si aún no existe). */
+export async function crearEntrega(tx: Tx, pedidoId: number) {
+  const [ya] = await tx.select({ id: entregas.id }).from(entregas).where(eq(entregas.pedidoId, pedidoId))
+  if (ya) return
+  const [p] = await tx.select().from(pedidos).where(eq(pedidos.id, pedidoId))
+  const [cli] = await tx.select().from(clientes).where(eq(clientes.id, p.clienteId))
+  const cargos = await tx
+    .select({ concepto: pedidoCargos.concepto, valor: pedidoCargos.valor })
+    .from(pedidoCargos)
+    .where(eq(pedidoCargos.pedidoId, pedidoId))
+  await tx.insert(entregas).values({
+    pedidoId,
+    modalidad: p.modalidad,
+    direccion: p.modalidad === 'recoge' ? '' : (cli?.direccion ?? ''),
+    ciudad: cli?.ciudad ?? '',
+    recibe: cli?.nombre ?? '',
+    telefono: cli?.whatsapp ?? '',
+    costoCobrado: costoEnvioCobrado(cargos),
+  })
+}
+
+type FilaEntrega = typeof entregas.$inferSelect
+
+/** Convierte la fila en lo que ve la pantalla. */
+export function entregaPublica(e: FilaEntrega, mensajero: string | null): Entrega {
+  return {
+    id: e.id,
+    pedidoId: e.pedidoId,
+    modalidad: e.modalidad as Entrega['modalidad'],
+    estado: e.estado as EstadoEntrega,
+    fechaProgramada: e.fechaProgramada?.toISOString() ?? null,
+    franja: e.franja,
+    direccion: e.direccion,
+    ciudad: e.ciudad,
+    recibe: e.recibe,
+    telefono: e.telefono,
+    quienLleva: (e.quienLleva as Entrega['quienLleva']) ?? null,
+    mensajero: e.mensajeroId ? { id: e.mensajeroId, nombre: mensajero ?? '—' } : null,
+    servicioTercero: e.servicioTercero,
+    transportadora: e.transportadora,
+    guia: e.guia,
+    costoCobrado: e.costoCobrado,
+    costoReal: e.costoReal,
+    contraentrega: e.contraentrega,
+    montoContraentrega: e.montoContraentrega,
+    evidenciaUrl: e.evidenciaUrl,
+    novedad: e.novedad,
+    recibidoPor: e.recibidoPor,
+    entregadaEn: e.entregadaEn?.toISOString() ?? null,
+    notas: e.notas,
+  }
+}
+
+export async function leerEntrega(tx: Tx, pedidoId: number) {
+  const [f] = await tx
+    .select({ e: entregas, mensajero: usuarios.nombre })
+    .from(entregas)
+    .leftJoin(usuarios, eq(usuarios.id, entregas.mensajeroId))
+    .where(eq(entregas.pedidoId, pedidoId))
+  return f ? entregaPublica(f.e, f.mensajero) : null
 }

@@ -381,9 +381,53 @@ export const pagos = pgTable('pagos', {
   monto: integer('monto').notNull(),
   referencia: text('referencia').notNull().default(''),
   comprobanteUrl: text('comprobante_url'),
+  /** Motivo de una devolución (reembolso). */
+  nota: text('nota').notNull().default(''),
   usuarioId: integer('usuario_id').references(() => usuarios.id),
   creadoEn: creadoEn(),
 })
+
+/**
+ * Entrega de cada pedido: recoge en taller, domicilio local o transportadora.
+ * por_programar | programada | en_camino | entregada
+ */
+export const entregas = pgTable(
+  'entregas',
+  {
+    id: serial('id').primaryKey(),
+    pedidoId: integer('pedido_id')
+      .notNull()
+      .unique()
+      .references(() => pedidos.id, { onDelete: 'cascade' }),
+    modalidad: text('modalidad').notNull(),
+    estado: text('estado').notNull().default('por_programar'),
+    fechaProgramada: timestamp('fecha_programada', { withTimezone: true }),
+    franja: text('franja').notNull().default(''),
+    direccion: text('direccion').notNull().default(''),
+    ciudad: text('ciudad').notNull().default(''),
+    recibe: text('recibe').notNull().default(''),
+    telefono: text('telefono').notNull().default(''),
+    /** mensajero | tercero */
+    quienLleva: text('quien_lleva'),
+    mensajeroId: integer('mensajero_id').references(() => usuarios.id),
+    servicioTercero: text('servicio_tercero').notNull().default(''),
+    transportadora: text('transportadora').notNull().default(''),
+    guia: text('guia').notNull().default(''),
+    costoCobrado: integer('costo_cobrado').notNull().default(0),
+    costoReal: integer('costo_real'),
+    contraentrega: boolean('contraentrega').notNull().default(false),
+    montoContraentrega: integer('monto_contraentrega').notNull().default(0),
+    evidenciaUrl: text('evidencia_url'),
+    novedad: text('novedad').notNull().default(''),
+    recibidoPor: text('recibido_por').notNull().default(''),
+    salioEn: timestamp('salio_en', { withTimezone: true }),
+    entregadaEn: timestamp('entregada_en', { withTimezone: true }),
+    notas: text('notas').notNull().default(''),
+    creadoEn: creadoEn(),
+    actualizadoEn: actualizadoEn(),
+  },
+  (t) => [index('entregas_estado_idx').on(t.estado)]
+)
 
 /** Quién cambió qué y cuándo (también las notas del pedido). */
 export const historialEstados = pgTable(

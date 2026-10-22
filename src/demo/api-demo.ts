@@ -51,7 +51,7 @@ type EstadoDemo = {
   pedidos: PedidosDemo
 }
 
-const CLAVE = 'hec-demo-v4'
+const CLAVE = 'hec-demo-v5'
 const MAX_INTENTOS = 5
 const MINUTOS_BLOQUEO = 15
 
@@ -148,7 +148,18 @@ function ejemploCotizacion(estado: EstadoDemo) {
     const orden = cola.ordenes.find((o) => o.pedido?.id === pedido.id)
     if (orden)
       como(3, `/cola/${orden.id}/empezar`, { impresoraId: 1, bobinaId: 1 })
-    // 3) Algo para stock esperando turno
+    // 3) Pedido que salió del stock: listo para programar la entrega
+    const deStock = como(2, '/cotizaciones', {
+      clienteId: 1,
+      modalidad: 'local',
+      lineas: [{ productoId: 2, cantidad: 10, precioVenta: precio(2) }],
+      cargos: [{ concepto: 'Envío', valor: 8000 }],
+      notas: 'Tarjetas para el mostrador.',
+    }).cotizacion
+    como(2, `/cotizaciones/${deStock.id}/enviar`)
+    como(2, `/cotizaciones/${deStock.id}/aprobar`)
+    como(2, '/pedidos', { cotizacionId: deStock.id })
+    // 4) Algo para stock esperando turno
     como(3, '/cola/stock', { productoId: 2, cantidad: 12 })
   } catch {
     // Si los datos de ejemplo cambian, la demo arranca con menos ejemplos.
@@ -482,7 +493,12 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
   }
 
   // ---- Pedidos y cola de impresión ----
-  if (ruta.startsWith('/pedidos') || ruta.startsWith('/cola')) {
+  if (
+    ruta.startsWith('/pedidos') ||
+    ruta.startsWith('/cola') ||
+    ruta.startsWith('/entregas') ||
+    ruta === '/cobros'
+  ) {
     const persona = yo(estado)
     const respuesta = atenderPedidos(
       {
@@ -491,6 +507,9 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
         taller: estado.taller,
         config: estado.config,
         nombres: new Map(estado.personas.map((p) => [p.id, p.nombre])),
+        mensajeros: estado.personas
+          .filter((p) => p.activo && p.roles.includes('entregas'))
+          .map((p) => ({ id: p.id, nombre: p.nombre })),
       },
       persona,
       ruta,

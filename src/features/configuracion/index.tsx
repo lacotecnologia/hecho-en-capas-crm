@@ -208,7 +208,9 @@ export function Configuracion() {
                         onChange={(e) => cambiar(e.target.value)}
                       />
                     )}
-                    <p className='text-sm text-muted-foreground'>{campo.ayuda}</p>
+                    <p className='text-sm text-muted-foreground'>
+                      {campo.ayuda}
+                    </p>
                   </div>
                 )
               })}

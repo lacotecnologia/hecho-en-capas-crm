@@ -3,6 +3,7 @@
  * que usan el servidor, la pantalla y la versión de prueba.
  */
 import { type Cargo, type Modalidad } from './cotizacion.js'
+import { type Entrega, type EstadoPago } from './entregas.js'
 
 // ---------- Estados ----------
 
@@ -81,11 +82,12 @@ export const METODOS_PAGO_INFO: Record<MetodoPago, string> = {
   datafono: 'Datáfono',
 }
 
-export type TipoPago = 'anticipo' | 'abono' | 'saldo'
+export type TipoPago = 'anticipo' | 'abono' | 'saldo' | 'reembolso'
 export const TIPOS_PAGO_INFO: Record<TipoPago, string> = {
   anticipo: 'Anticipo',
   abono: 'Abono',
   saldo: 'Pago final',
+  reembolso: 'Devolución',
 }
 
 // ---------- Tipos ----------
@@ -114,6 +116,10 @@ export type Pago = {
   referencia: string
   usuario: string
   creadoEn: string
+  /** Foto del comprobante (opcional). */
+  comprobanteUrl: string | null
+  /** Motivo de una devolución. */
+  nota: string
 }
 
 export type EventoHistorial = {
@@ -140,6 +146,7 @@ export type PedidoResumen = {
   avance: { listas: number; total: number }
   fechaCompromiso: string | null
   creadoEn: string
+  estadoPago: EstadoPago
 }
 
 export type PedidoDetalle = PedidoResumen & {
@@ -165,6 +172,8 @@ export type PedidoDetalle = PedidoResumen & {
   diasEnvio: number
   notas: string
   motivoCancelacion: string
+  numeroFactura: string
+  entrega: Entrega | null
   pagos: Pago[]
   historial: EventoHistorial[]
 }
@@ -263,10 +272,12 @@ export function calcularEstadoPedido(p: {
 }): EstadoPedido {
   if (p.cancelado) return 'cancelado'
   if (p.entregado) return p.pagado >= p.total ? 'cerrado' : 'entregado'
-  if (p.enEntrega) return 'en_entrega'
-  if (!puedeProducir(p)) return 'confirmado'
   const activas = p.estadosLineas.filter((e) => e !== 'cancelada')
-  if (activas.length > 0 && activas.every((e) => e === 'listo')) return 'listo'
+  const todoListo = activas.length > 0 && activas.every((e) => e === 'listo')
+  // La entrega programada o en camino solo cuenta si ya está todo impreso
+  if (p.enEntrega && todoListo) return 'en_entrega'
+  if (!puedeProducir(p)) return 'confirmado'
+  if (todoListo) return 'listo'
   return 'en_produccion'
 }
 

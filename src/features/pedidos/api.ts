@@ -27,9 +27,29 @@ export const convertirCotizacion = (cotizacionId: number) =>
 
 export const registrarPago = (
   id: number,
-  datos: { monto: number; metodo: string; referencia: string }
+  datos: {
+    monto: number
+    metodo: string
+    referencia: string
+    comprobanteUrl?: string | null
+  }
 ) =>
   api<RespuestaPedido>(`/pedidos/${id}/pagos`, { method: 'POST', body: datos })
+
+export const devolverPlata = (
+  id: number,
+  datos: { monto: number; metodo: string; motivo: string }
+) =>
+  api<RespuestaPedido>(`/pedidos/${id}/reembolso`, {
+    method: 'POST',
+    body: datos,
+  })
+
+export const guardarFactura = (id: number, numeroFactura: string) =>
+  api<RespuestaPedido>(`/pedidos/${id}/factura`, {
+    method: 'PATCH',
+    body: { numeroFactura },
+  })
 
 export const producirSinAnticipo = (id: number) =>
   api<RespuestaPedido>(`/pedidos/${id}/producir-sin-anticipo`, {

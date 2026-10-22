@@ -10,6 +10,20 @@ import {
   sumarDiasHabiles,
 } from '@shared/cotizacion'
 import {
+  costoEnvioCobrado,
+  type Entrega,
+  type EntregaLista,
+  estadoPago,
+  type PedidoPorCobrar,
+  puedeSalir,
+  type ResumenCobros,
+  validarEntregada,
+  validarNovedad,
+  validarProgramacion,
+  validarReembolso,
+} from '@shared/entregas'
+import {
+  anticipoPendiente,
   calcularEstadoPedido,
   codigoPedido,
   codigoSeguimiento,
@@ -62,6 +76,7 @@ type PedidoDemo = {
   fechaCompromiso: string | null
   notas: string
   motivoCancelacion: string
+  numeroFactura?: string
   lineas: LineaDemo[]
   cargos: Cargo[]
   creadoEn: string
@@ -94,9 +109,13 @@ type PagoDemo = {
   metodo: MetodoPago
   monto: number
   referencia: string
+  comprobanteUrl?: string | null
+  nota?: string
   usuarioId: number
   creadoEn: string
 }
+
+type EntregaDemo = Omit<Entrega, 'mensajero'> & { mensajeroId: number | null }
 
 type EventoDemo = {
   id: number
@@ -115,6 +134,7 @@ export type PedidosDemo = {
   ordenes: OrdenDemo[]
   pagos: PagoDemo[]
   historial: EventoDemo[]
+  entregas?: EntregaDemo[]
 }
 
 export const pedidosInicial = (): PedidosDemo => ({
@@ -150,6 +170,8 @@ export type ContextoDemo = {
   taller: TallerDemo
   config: ValoresConfig
   nombres: Map<number, string>
+  /** Personas con rol de Entregas (para elegir mensajero). */
+  mensajeros: { id: number; nombre: string }[]
 }
 
 /** El pedido que salió de una cotización (para la pantalla de la cotización). */
@@ -165,10 +187,13 @@ export function atenderPedidos(
   metodo: string,
   c: Record<string, unknown>
 ): unknown {
-  const { d, cot, taller, config, nombres } = ctx
+  const { d, cot, taller, config, nombres, mensajeros } = ctx
+  d.entregas ??= []
+  const entregas = d.entregas
   const tiene = (...r: Rol[]) => u.roles.some((x) => r.includes(x))
   const esAdmin = tiene('admin')
   const veDinero = tiene('admin', 'comercial')
+  const veSaldo = veDinero || tiene('entregas')
 
   const anotar = (
     e: Omit<
@@ -218,10 +243,13 @@ export function atenderPedidos(
         ).toISOString()
       }
     }
+    const ent = entregas.find((x) => x.pedidoId === p.id)
     const estado = calcularEstadoPedido({
       ...base,
       cancelado: p.estado === 'cancelado',
       estadosLineas: p.lineas.map((l) => estadoLinea(p, l)),
+      enEntrega: ent?.estado === 'programada' || ent?.estado === 'en_camino',
+      entregado: ent?.estado === 'entregada',
     })
     if (estado !== p.estado) {
       anotar({
@@ -259,7 +287,12 @@ export function atenderPedidos(
         nombre: nombres.get(p.comercialId) ?? '—',
       },
       total: p.total,
-      pagado: veDinero ? pagado(p.id) : 0,
+      pagado: veSaldo ? pagado(p.id) : 0,
+      estadoPago: estadoPago({
+        ...p,
+        pagado: pagado(p.id),
+        cancelado: p.estado === 'cancelado',
+      }),
       avance: {
         listas: lineas.filter((e) => e === 'listo').length,
         total: lineas.length,
@@ -300,10 +333,17 @@ export function atenderPedidos(
       diasEnvio: p.diasEnvio,
       notas: p.notas,
       motivoCancelacion: p.motivoCancelacion,
+      numeroFactura: p.numeroFactura ?? '',
+      entrega: entregaVista(entregas.find((x) => x.pedidoId === p.id)),
       pagos: veDinero
         ? d.pagos
             .filter((x) => x.pedidoId === p.id)
-            .map((x) => ({ ...x, usuario: nombres.get(x.usuarioId) ?? '—' }))
+            .map((x) => ({
+              ...x,
+              comprobanteUrl: x.comprobanteUrl ?? null,
+              nota: x.nota ?? '',
+              usuario: nombres.get(x.usuarioId) ?? '—',
+            }))
         : [],
       historial: d.historial
         .filter((h) => h.entidad === 'pedido' && h.entidadId === p.id)
@@ -319,6 +359,47 @@ export function atenderPedidos(
           creadoEn: h.creadoEn,
         })),
     }
+  }
+
+  const entregaVista = (e: EntregaDemo | undefined): Entrega | null =>
+    e
+      ? {
+          ...e,
+          mensajero: e.mensajeroId
+            ? { id: e.mensajeroId, nombre: nombres.get(e.mensajeroId) ?? '—' }
+            : null,
+        }
+      : null
+
+  const crearEntrega = (p: PedidoDemo) => {
+    if (entregas.some((x) => x.pedidoId === p.id)) return
+    const cli = cot.clientes.find((x) => x.id === p.clienteId)
+    entregas.push({
+      id: sig(entregas),
+      pedidoId: p.id,
+      modalidad: p.modalidad,
+      estado: 'por_programar',
+      fechaProgramada: null,
+      franja: '',
+      direccion: p.modalidad === 'recoge' ? '' : (cli?.direccion ?? ''),
+      ciudad: cli?.ciudad ?? '',
+      recibe: cli?.nombre ?? '',
+      telefono: cli?.whatsapp ?? '',
+      quienLleva: null,
+      mensajeroId: null,
+      servicioTercero: '',
+      transportadora: '',
+      guia: '',
+      costoCobrado: costoEnvioCobrado(p.cargos),
+      costoReal: null,
+      contraentrega: false,
+      montoContraentrega: 0,
+      evidenciaUrl: null,
+      novedad: '',
+      recibidoPor: '',
+      entregadaEn: null,
+      notas: '',
+    })
   }
 
   const buscar = (id: string) => {
@@ -432,6 +513,7 @@ export function atenderPedidos(
         actualizadoEn: ahora(),
       }
       d.pedidos.push(p)
+      crearEntrega(p)
       for (const l of lineas.filter((x) => !x.desdeStock)) {
         d.ordenes.push({
           id: sig(d.ordenes),
@@ -482,6 +564,7 @@ export function atenderPedidos(
         pedidoId: p.id,
         tipo: tipoDePago({ ...p, pagadoAntes: antes, monto: v.datos.monto }),
         ...v.datos,
+        comprobanteUrl: c.comprobanteUrl ? String(c.comprobanteUrl) : null,
         usuarioId: u.id,
         creadoEn: ahora(),
       })
@@ -569,7 +652,317 @@ export function atenderPedidos(
       })
       return { pedido: detalle(p) }
     }
+    r = ruta.match(/^\/pedidos\/(\d+)\/reembolso$/)
+    if (r && metodo === 'POST') {
+      if (!esAdmin) fallo(403, SIN_PERMISO)
+      const p = buscar(r[1])
+      const v = validarReembolso(c, pagado(p.id))
+      if (!v.ok) return fallo(400, v.mensaje, v.campo)
+      d.pagos.push({
+        id: sig(d.pagos),
+        pedidoId: p.id,
+        tipo: 'reembolso',
+        metodo: v.datos.metodo,
+        monto: -v.datos.monto,
+        referencia: '',
+        nota: v.datos.motivo,
+        usuarioId: u.id,
+        creadoEn: ahora(),
+      })
+      // En un pedido que sigue, la devolución es un descuento: baja el total
+      if (p.estado !== 'cancelado') p.total -= v.datos.monto
+      anotar({
+        entidad: 'pedido',
+        entidadId: p.id,
+        nota: `Pago devuelto al cliente: $ ${v.datos.monto.toLocaleString('es-CO')} — ${v.datos.motivo}`,
+      })
+      recalcular(p)
+      return { pedido: detalle(p) }
+    }
+
+    r = ruta.match(/^\/pedidos\/(\d+)\/factura$/)
+    if (r && metodo === 'PATCH') {
+      soloVende()
+      const p = buscar(r[1])
+      if (!puedeCobrar(p)) fallo(403, 'Este pedido es de otro comercial.')
+      p.numeroFactura = String(c.numeroFactura ?? '')
+        .trim()
+        .slice(0, 40)
+      return { pedido: detalle(p) }
+    }
     return undefined
+  }
+
+  // ===================== Entregas =====================
+  if (ruta.startsWith('/entregas')) {
+    if (!tiene('admin', 'comercial', 'entregas')) fallo(403, SIN_PERMISO)
+    const veEntrega = (p: PedidoDemo) =>
+      tiene('admin', 'entregas') || p.comercialId === u.id
+    const programa = (p: PedidoDemo) =>
+      esAdmin || (tiene('comercial') && p.comercialId === u.id)
+
+    if (ruta === '/entregas' && metodo === 'GET') {
+      const hace30 = Date.now() - 30 * 86_400_000
+      for (const p of d.pedidos.filter((x) => DE_ENTREGA.includes(x.estado)))
+        crearEntrega(p)
+      const lista: EntregaLista[] = entregas
+        .map((e) => ({ e, p: d.pedidos.find((x) => x.id === e.pedidoId)! }))
+        .filter(({ p }) => p && DE_ENTREGA.includes(p.estado) && veEntrega(p))
+        .filter(
+          ({ e }) =>
+            e.estado !== 'entregada' ||
+            new Date(e.entregadaEn ?? 0).getTime() >= hace30
+        )
+        .sort((a, b) =>
+          (a.e.fechaProgramada ?? '').localeCompare(b.e.fechaProgramada ?? '')
+        )
+        .map(({ e, p }) => {
+          const cli = cot.clientes.find((x) => x.id === p.clienteId)
+          return {
+            ...entregaVista(e)!,
+            pedido: {
+              id: p.id,
+              codigo: p.codigo,
+              cliente: cli?.nombre ?? '—',
+              whatsapp: cli?.whatsapp ?? '',
+              listo: DE_ENTREGA.includes(p.estado),
+              saldo: p.total - pagado(p.id),
+              cancelado: false,
+            },
+          }
+        })
+      return { entregas: lista }
+    }
+    if (ruta === '/entregas/mensajeros' && metodo === 'GET') {
+      if (!tiene('admin', 'comercial')) fallo(403, SIN_PERMISO)
+      return { mensajeros }
+    }
+    const r = ruta.match(
+      /^\/entregas\/(\d+)\/(programar|salir|entregada|novedad)$/
+    )
+    if (r && metodo === 'POST') {
+      const e = entregas.find((x) => x.id === Number(r[1]))
+      const p = e && d.pedidos.find((x) => x.id === e.pedidoId)
+      if (!e || !p || !veEntrega(p))
+        return fallo(404, 'No encontramos esa entrega.')
+      if (p.estado === 'cancelado')
+        fallo(400, 'El pedido se canceló: ya no se entrega.')
+      const saldo = p.total - pagado(p.id)
+      const accion = r[2]
+      if (accion === 'programar') {
+        if (!programa(p))
+          fallo(
+            403,
+            'Solo el comercial del pedido o el administrador programan la entrega.'
+          )
+        if (!['listo', 'en_entrega'].includes(p.estado)) {
+          fallo(
+            400,
+            'La entrega se programa cuando el pedido esté listo en el taller.'
+          )
+        }
+        if (!['por_programar', 'programada'].includes(e.estado)) {
+          fallo(400, 'Ya salió: si hubo un problema, usa “Hubo una novedad”.')
+        }
+        const v = validarProgramacion(
+          c,
+          e.modalidad,
+          saldo,
+          mensajeros.map((m) => m.id)
+        )
+        if (!v.ok) return fallo(400, v.mensaje, v.campo)
+        Object.assign(e, v.datos, { estado: 'programada', novedad: '' })
+        const cuando = new Intl.DateTimeFormat('es-CO', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        }).format(new Date(v.datos.fechaProgramada))
+        anotar({
+          entidad: 'pedido',
+          entidadId: p.id,
+          nota:
+            e.modalidad === 'recoge'
+              ? `Listo para recoger el ${cuando}.`
+              : e.modalidad === 'nacional'
+                ? `Se despacha por ${v.datos.transportadora} el ${cuando}.`
+                : `Entrega programada para el ${cuando}${v.datos.franja ? ` (${v.datos.franja.toLowerCase()})` : ''}.`,
+          visibleCliente: true,
+        })
+      } else if (accion === 'salir') {
+        if (e.modalidad === 'recoge')
+          fallo(
+            400,
+            'En “recoge en el taller” no hay salida: marca directamente que la recogió.'
+          )
+        if (e.estado !== 'programada')
+          fallo(
+            400,
+            e.estado === 'por_programar'
+              ? 'Primero programa la entrega.'
+              : 'Esta entrega ya salió.'
+          )
+        const ok = puedeSalir({
+          listo: true,
+          saldo,
+          contraentrega: e.contraentrega,
+          montoContraentrega: e.montoContraentrega,
+        })
+        if (!ok.ok) return fallo(400, ok.mensaje)
+        const guia = String(c.guia ?? e.guia).trim()
+        if (e.modalidad === 'nacional' && !guia)
+          fallo(400, 'Escribe el número de guía de la transportadora.', 'guia')
+        e.guia = guia
+        if (c.costoReal !== undefined && c.costoReal !== '')
+          e.costoReal = Math.round(Number(c.costoReal)) || 0
+        e.estado = 'en_camino'
+        anotar({
+          entidad: 'pedido',
+          entidadId: p.id,
+          nota:
+            e.modalidad === 'nacional'
+              ? `Despachado por ${e.transportadora}. Guía ${guia}.`
+              : 'Salió a entregar.',
+          visibleCliente: true,
+        })
+      } else if (accion === 'entregada') {
+        if (!['programada', 'en_camino'].includes(e.estado))
+          fallo(400, 'Primero programa la entrega.')
+        const ok = puedeSalir({
+          listo: true,
+          saldo,
+          contraentrega: e.contraentrega,
+          montoContraentrega: e.montoContraentrega,
+        })
+        if (!ok.ok) return fallo(400, ok.mensaje)
+        const v = validarEntregada(c, e, saldo)
+        if (!v.ok) return fallo(400, v.mensaje, v.campo)
+        if (v.datos.montoCobrado > 0 && v.datos.metodo) {
+          d.pagos.push({
+            id: sig(d.pagos),
+            pedidoId: p.id,
+            tipo: tipoDePago({
+              ...p,
+              pagadoAntes: pagado(p.id),
+              monto: v.datos.montoCobrado,
+            }),
+            metodo: v.datos.metodo,
+            monto: v.datos.montoCobrado,
+            referencia: 'Cobrado al entregar',
+            usuarioId: u.id,
+            creadoEn: ahora(),
+          })
+          anotar({
+            entidad: 'pedido',
+            entidadId: p.id,
+            nota: `Pago registrado al entregar: $ ${v.datos.montoCobrado.toLocaleString('es-CO')}`,
+          })
+        }
+        Object.assign(e, {
+          estado: 'entregada',
+          recibidoPor: v.datos.recibidoPor,
+          evidenciaUrl: v.datos.evidenciaUrl,
+          entregadaEn: ahora(),
+          novedad: '',
+        })
+        anotar({
+          entidad: 'pedido',
+          entidadId: p.id,
+          nota: `Entregado. Recibió: ${v.datos.recibidoPor}.`,
+          visibleCliente: true,
+        })
+      } else {
+        if (!['programada', 'en_camino'].includes(e.estado))
+          fallo(400, 'Esta entrega no está en curso.')
+        const v = validarNovedad(c)
+        if (!v.ok) return fallo(400, v.mensaje, v.campo)
+        e.estado = 'programada'
+        e.novedad = v.motivo
+        anotar({
+          entidad: 'pedido',
+          entidadId: p.id,
+          nota: `Novedad en la entrega: ${v.motivo}. Hay que volver a programarla.`,
+          visibleCliente: true,
+        })
+      }
+      recalcular(p)
+      return { entrega: entregaVista(e) }
+    }
+    return undefined
+  }
+
+  // ===================== Cobros =====================
+  if (ruta === '/cobros' && metodo === 'GET') {
+    if (!tiene('admin', 'comercial')) fallo(403, SIN_PERMISO)
+    const mios = d.pedidos.filter((p) => esAdmin || p.comercialId === u.id)
+    const fila = (p: PedidoDemo): PedidoPorCobrar => {
+      const pag = pagado(p.id)
+      const cancelado = p.estado === 'cancelado'
+      const cli = cot.clientes.find((x) => x.id === p.clienteId)
+      return {
+        id: p.id,
+        codigo: p.codigo,
+        estado: p.estado,
+        cliente: { nombre: cli?.nombre ?? '—', whatsapp: cli?.whatsapp ?? '' },
+        comercial: nombres.get(p.comercialId) ?? '—',
+        total: p.total,
+        pagado: pag,
+        saldo: p.total - pag,
+        anticipoPendiente: cancelado
+          ? 0
+          : anticipoPendiente({ ...p, pagado: pag }),
+        estadoPago: estadoPago({ ...p, pagado: pag, cancelado }),
+        contraentrega:
+          entregas.find((x) => x.pedidoId === p.id)?.contraentrega ?? false,
+        fechaCompromiso: p.fechaCompromiso,
+      }
+    }
+    const porCobrar = mios
+      .filter((p) => p.estado !== 'cancelado' && p.total - pagado(p.id) > 0)
+      .map(fila)
+    const porDevolver = mios
+      .filter((p) => p.estado === 'cancelado' && pagado(p.id) > 0)
+      .map(fila)
+    const ids = new Set(mios.map((p) => p.id))
+    const lista = d.pagos
+      .filter((x) => ids.has(x.pedidoId))
+      .sort((a, b) => b.id - a.id)
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    const mes = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+    const suma = (desde: Date) =>
+      lista
+        .filter((x) => new Date(x.creadoEn) >= desde)
+        .reduce((s, x) => s + x.monto, 0)
+    const r: ResumenCobros = {
+      porCobrar,
+      porDevolver,
+      pagos: lista.map((x) => {
+        const p = d.pedidos.find((y) => y.id === x.pedidoId)!
+        return {
+          id: x.id,
+          tipo: x.tipo,
+          metodo: x.metodo,
+          monto: x.monto,
+          referencia: x.referencia,
+          nota: x.nota ?? '',
+          comprobanteUrl: x.comprobanteUrl ?? null,
+          usuario: nombres.get(x.usuarioId) ?? '—',
+          creadoEn: x.creadoEn,
+          pedido: {
+            id: p.id,
+            codigo: p.codigo,
+            cliente:
+              cot.clientes.find((y) => y.id === p.clienteId)?.nombre ?? '—',
+          },
+        }
+      }),
+      totales: {
+        hoy: suma(hoy),
+        mes: suma(mes),
+        porCobrar: porCobrar.reduce((s, x) => s + x.saldo, 0),
+      },
+    }
+    return r
   }
 
   // ===================== Cola =====================
