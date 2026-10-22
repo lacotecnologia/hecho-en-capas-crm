@@ -22,6 +22,7 @@ import {
   validarProgramacion,
   validarReembolso,
 } from '@shared/entregas'
+import { type Pendiente } from '@shared/inicio'
 import {
   anticipoPendiente,
   calcularEstadoPedido,
@@ -45,7 +46,20 @@ import {
   validarNota,
   validarPago,
 } from '@shared/pedidos'
+import {
+  diaBogota,
+  limitesMes,
+  MES_VALIDO,
+  mesActual,
+  type ReporteMes,
+} from '@shared/reportes'
 import { type Rol } from '@shared/roles'
+import {
+  type EstadoLineaCliente,
+  normalizarCodigo,
+  type SeguimientoPublico,
+  textoEventoCliente,
+} from '@shared/seguimiento'
 import { ApiError } from '@/lib/api'
 import { type CotizarDemo } from './cotizar-demo'
 import { portadaDe, type TallerDemo } from './taller-demo'
@@ -172,6 +186,7 @@ export type ContextoDemo = {
   nombres: Map<number, string>
   /** Personas con rol de Entregas (para elegir mensajero). */
   mensajeros: { id: number; nombre: string }[]
+  textos: Record<string, string>
 }
 
 /** El pedido que salió de una cotización (para la pantalla de la cotización). */
@@ -187,7 +202,7 @@ export function atenderPedidos(
   metodo: string,
   c: Record<string, unknown>
 ): unknown {
-  const { d, cot, taller, config, nombres, mensajeros } = ctx
+  const { d, cot, taller, config, nombres, mensajeros, textos } = ctx
   d.entregas ??= []
   const entregas = d.entregas
   const tiene = (...r: Rol[]) => u.roles.some((x) => r.includes(x))
@@ -406,6 +421,322 @@ export function atenderPedidos(
     const p = d.pedidos.find((x) => x.id === Number(id))
     if (!p || !puedeVer(p)) return fallo(404, NO_EXISTE)
     return p
+  }
+
+  // ===================== Seguimiento público (sin login) =====================
+  const seg = ruta.match(/^\/seguimiento\/([^/?]+)$/)
+  if (seg && metodo === 'GET') {
+    const NO =
+      'No encontramos un pedido con ese código. Revisa que esté bien escrito (empieza por HC-) o escríbenos.'
+    const codigo = normalizarCodigo(decodeURIComponent(seg[1]))
+    const p = codigo
+      ? d.pedidos.find((x) => x.seguimiento === codigo)
+      : undefined
+    if (!p) return fallo(404, NO)
+    const pag = pagado(p.id)
+    const e = entregas.find((x) => x.pedidoId === p.id)
+    const lineaCliente = (l: LineaDemo): EstadoLineaCliente => {
+      const est = estadoLinea(p, l)
+      return est === 'listo'
+        ? 'listo'
+        : est === 'espera_anticipo'
+          ? 'esperando'
+          : 'fabricando'
+    }
+    const vistos = new Set<string>()
+    const eventos: SeguimientoPublico['eventos'] = []
+    for (const ev of d.historial.filter(
+      (h) => h.entidad === 'pedido' && h.entidadId === p.id && h.visibleCliente
+    )) {
+      const texto = textoEventoCliente(ev)
+      if (!texto || vistos.has(texto)) continue
+      vistos.add(texto)
+      eventos.push({ fecha: ev.creadoEn, texto })
+    }
+    const r: SeguimientoPublico = {
+      codigo: p.codigo,
+      seguimiento: p.seguimiento,
+      cliente: (cot.clientes.find((x) => x.id === p.clienteId)?.nombre ?? '')
+        .split(' ')
+        .slice(0, 3)
+        .join(' '),
+      estado: p.estado,
+      fechaCompromiso: p.fechaCompromiso,
+      modalidad: p.modalidad,
+      lineas: p.lineas.map((l) => ({
+        nombre: l.nombre,
+        cantidad: l.cantidad,
+        imagen: l.imagen,
+        estado: lineaCliente(l),
+      })),
+      entrega:
+        e && e.estado !== 'por_programar'
+          ? {
+              estado: e.estado,
+              fechaProgramada: e.fechaProgramada,
+              franja: e.franja,
+              transportadora: e.transportadora,
+              guia: e.guia,
+              recibidoPor: e.recibidoPor,
+              entregadaEn: e.entregadaEn,
+            }
+          : null,
+      dinero: {
+        total: p.total,
+        pagado: pag,
+        falta: Math.max(0, p.total - pag),
+        anticipoPendiente:
+          p.estado === 'cancelado'
+            ? 0
+            : anticipoPendiente({ ...p, pagado: pag }),
+      },
+      eventos: eventos.reverse(),
+      negocio: {
+        whatsapp: textos.negocio_whatsapp ?? '',
+        email: textos.negocio_email ?? '',
+        ciudad: textos.negocio_ciudad ?? '',
+        datosPago: textos.datos_pago ?? '',
+      },
+    }
+    return { pedido: r }
+  }
+
+  // ===================== Reportes =====================
+  if (ruta.startsWith('/reportes') && metodo === 'GET') {
+    if (!tiene('admin', 'comercial')) fallo(403, SIN_PERMISO)
+    const mes =
+      new URLSearchParams(ruta.split('?')[1] ?? '').get('mes') ?? mesActual()
+    if (!MES_VALIDO.test(mes)) fallo(400, 'El mes debe tener la forma 2026-10.')
+    const { desde, hasta, dias } = limitesMes(mes)
+    const mios = (p: PedidoDemo) => esAdmin || p.comercialId === u.id
+    const enMes = (f: string) => new Date(f) >= desde && new Date(f) < hasta
+    const delMes = d.pedidos.filter(
+      (p) => mios(p) && p.estado !== 'cancelado' && enMes(p.creadoEn)
+    )
+    const porDia = Array.from({ length: dias }, (_, i) => ({
+      dia: i + 1,
+      total: 0,
+      pedidos: 0,
+    }))
+    const com = new Map<number, ReporteMes['comerciales'][number]>()
+    for (const p of delMes) {
+      const x = porDia[diaBogota(new Date(p.creadoEn)) - 1]
+      x.total += p.total
+      x.pedidos++
+      const k = com.get(p.comercialId) ?? {
+        id: p.comercialId,
+        nombre: nombres.get(p.comercialId) ?? '—',
+        pedidos: 0,
+        ventas: 0,
+        ganancia: 0,
+        gananciaPagada: 0,
+      }
+      k.pedidos++
+      k.ventas += p.total
+      k.ganancia += p.ganancia
+      if (pagado(p.id) >= p.total) k.gananciaPagada += p.ganancia
+      com.set(p.comercialId, k)
+    }
+    const total = delMes.reduce((a, p) => a + p.total, 0)
+    const idsMios = new Set(d.pedidos.filter(mios).map((p) => p.id))
+    const prod = new Map<number, ReporteMes['productos'][number]>()
+    for (const p of delMes) {
+      for (const l of p.lineas) {
+        const x = prod.get(l.productoId) ?? {
+          productoId: l.productoId,
+          nombre: l.nombre,
+          unidades: 0,
+          ventas: 0,
+        }
+        x.unidades += l.cantidad
+        x.ventas += l.cantidad * l.precioVenta
+        prod.set(l.productoId, x)
+      }
+    }
+    const env = entregas.filter(
+      (e) => delMes.some((p) => p.id === e.pedidoId) && e.costoReal !== null
+    )
+    const cliente = (id: number) => cot.clientes.find((x) => x.id === id)
+    const r: ReporteMes = {
+      mes,
+      ventas: {
+        total,
+        pedidos: delMes.length,
+        ticket: delMes.length ? Math.round(total / delMes.length) : 0,
+        cobrado: d.pagos
+          .filter((x) => idsMios.has(x.pedidoId) && enMes(x.creadoEn))
+          .reduce((a, x) => a + x.monto, 0),
+      },
+      porDia,
+      comerciales: [...com.values()].sort((a, b) => b.ventas - a.ventas),
+      pedidos: delMes.map((p) => ({
+        id: p.id,
+        codigo: p.codigo,
+        cliente: cliente(p.clienteId)?.nombre ?? '—',
+        comercial: nombres.get(p.comercialId) ?? '—',
+        fecha: p.creadoEn,
+        total: p.total,
+        ganancia: p.ganancia,
+        estadoPago: estadoPago({
+          ...p,
+          pagado: pagado(p.id),
+          cancelado: false,
+        }),
+      })),
+      porCobrar: d.pedidos
+        .filter(
+          (p) =>
+            mios(p) && p.estado === 'entregado' && p.total - pagado(p.id) > 0
+        )
+        .map((p) => ({
+          id: p.id,
+          codigo: p.codigo,
+          cliente: cliente(p.clienteId)?.nombre ?? '—',
+          whatsapp: cliente(p.clienteId)?.whatsapp ?? '',
+          comercial: nombres.get(p.comercialId) ?? '—',
+          entregadoEn:
+            entregas.find((e) => e.pedidoId === p.id)?.entregadaEn ?? null,
+          saldo: p.total - pagado(p.id),
+        })),
+      productos: [...prod.values()]
+        .sort((a, b) => b.unidades - a.unidades)
+        .slice(0, 10),
+      envios: {
+        cobrado: env.reduce((a, e) => a + e.costoCobrado, 0),
+        costoReal: env.reduce((a, e) => a + (e.costoReal ?? 0), 0),
+        conCosto: env.length,
+      },
+    }
+    return r
+  }
+
+  // ===================== Pendientes de Inicio =====================
+  if (ruta === '/inicio' && metodo === 'GET') {
+    const lista: Pendiente[] = []
+    const agregar = (
+      n: number,
+      [uno, varios]: [string, string],
+      url: string,
+      tono: Pendiente['tono'] = 'normal'
+    ) => {
+      if (n > 0)
+        lista.push({ cantidad: n, texto: n === 1 ? uno : varios, url, tono })
+    }
+    const mio = (comercialId: number) => esAdmin || comercialId === u.id
+    const ahoraMs = Date.now()
+    if (tiene('admin', 'comercial')) {
+      agregar(
+        cot.cotizaciones.filter(
+          (x) =>
+            mio(x.comercialId) &&
+            x.estado === 'enviada' &&
+            x.venceEn &&
+            new Date(x.venceEn).getTime() <= ahoraMs + 2 * 86_400_000
+        ).length,
+        [
+          'cotización vence en los próximos 2 días: llama al cliente',
+          'cotizaciones vencen en los próximos 2 días: llama al cliente',
+        ],
+        '/cotizar',
+        'urgente'
+      )
+      agregar(
+        cot.cotizaciones.filter(
+          (x) =>
+            mio(x.comercialId) &&
+            x.estado === 'aprobada' &&
+            !d.pedidos.some((p) => p.cotizacionId === x.id)
+        ).length,
+        [
+          'cotización aprobada por convertir en pedido',
+          'cotizaciones aprobadas por convertir en pedido',
+        ],
+        '/cotizar',
+        'urgente'
+      )
+      agregar(
+        d.pedidos.filter((p) => mio(p.comercialId) && p.estado === 'confirmado')
+          .length,
+        ['pedido espera el anticipo', 'pedidos esperan el anticipo'],
+        '/pedidos'
+      )
+      agregar(
+        d.pedidos.filter(
+          (p) =>
+            mio(p.comercialId) &&
+            p.estado === 'listo' &&
+            (entregas.find((e) => e.pedidoId === p.id)?.estado ??
+              'por_programar') === 'por_programar'
+        ).length,
+        [
+          'pedido listo sin entrega programada',
+          'pedidos listos sin entrega programada',
+        ],
+        '/entregas',
+        'urgente'
+      )
+      agregar(
+        d.pedidos.filter((p) => mio(p.comercialId) && p.estado === 'entregado')
+          .length,
+        [
+          'pedido entregado aún debe plata',
+          'pedidos entregados aún deben plata',
+        ],
+        '/cobros'
+      )
+    }
+    if (tiene('admin', 'fabricacion')) {
+      agregar(
+        taller.productos.filter((x) => x.estado === 'solicitud').length,
+        [
+          'personalizado pedido por un comercial espera diseño y precio',
+          'personalizados pedidos por los comerciales esperan diseño y precio',
+        ],
+        '/taller'
+      )
+      agregar(
+        d.ordenes.filter(
+          (o) =>
+            o.estado === 'imprimiendo' &&
+            o.finEstimado &&
+            new Date(o.finEstimado).getTime() < ahoraMs
+        ).length,
+        [
+          'impresión ya debió terminar: revisa la impresora',
+          'impresiones ya debieron terminar: revisa las impresoras',
+        ],
+        '/cola',
+        'urgente'
+      )
+      agregar(
+        d.ordenes.filter(
+          (o) => o.estado === 'en_cola' || o.estado === 'postproceso'
+        ).length,
+        [
+          'orden en la cola o por terminar',
+          'órdenes en la cola o por terminar',
+        ],
+        '/cola'
+      )
+    }
+    if (tiene('entregas')) {
+      const fin = new Date()
+      fin.setHours(23, 59, 59, 999)
+      agregar(
+        entregas.filter(
+          (e) =>
+            (e.mensajeroId === u.id || e.modalidad === 'recoge') &&
+            (e.estado === 'en_camino' ||
+              (e.estado === 'programada' &&
+                !!e.fechaProgramada &&
+                new Date(e.fechaProgramada) <= fin))
+        ).length,
+        ['entrega para hoy', 'entregas para hoy'],
+        '/entregas',
+        'urgente'
+      )
+    }
+    return { pendientes: lista }
   }
 
   // ===================== Pedidos =====================

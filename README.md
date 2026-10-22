@@ -9,14 +9,23 @@ Sistema interno para llevar cotizaciones, pedidos, taller (fabricación), cobros
 
 ## Estado
 
-| Fase                 | Qué incluye                                                         | Estado    |
-| -------------------- | ------------------------------------------------------------------- | --------- |
-| 1. Base              | Login con usuario + PIN, roles, Personas, Configuración, marca      | ✅ Lista  |
-| 2. Taller I          | Impresoras, bobinas, catálogo y precio de fábrica                   | ✅ Lista  |
-| 3. Cotizar           | Clientes, cotizador con cálculos, PDF, versiones y respuestas       | ✅ Lista  |
-| 4. Pedidos           | Pedidos, anticipo y cola de impresión por impresora                 | ✅ Lista  |
-| 5. Cobros y Entregas | Pagos con comprobante, devoluciones, entregas y vista del mensajero | ✅ Lista  |
-| 6. Seguimiento       | Página pública para el cliente y reportes                           | Pendiente |
+| Fase                 | Qué incluye                                                         | Estado   |
+| -------------------- | ------------------------------------------------------------------- | -------- |
+| 1. Base              | Login con usuario + PIN, roles, Personas, Configuración, marca      | ✅ Lista |
+| 2. Taller I          | Impresoras, bobinas, catálogo y precio de fábrica                   | ✅ Lista |
+| 3. Cotizar           | Clientes, cotizador con cálculos, PDF, versiones y respuestas       | ✅ Lista |
+| 4. Pedidos           | Pedidos, anticipo y cola de impresión por impresora                 | ✅ Lista |
+| 5. Cobros y Entregas | Pagos con comprobante, devoluciones, entregas y vista del mensajero | ✅ Lista |
+| 6. Seguimiento       | Página pública para el cliente, reportes y pendientes en Inicio     | ✅ Lista |
+
+## Seguimiento para el cliente
+
+Cada pedido tiene un código (por ejemplo `HC-7K4P2Q`). El cliente ve su pedido sin cuenta ni contraseña en:
+
+- `https://TU-DOMINIO/seguimiento/HC-7K4P2Q`, o
+- `https://TU-DOMINIO/seguimiento` y escribe el código.
+
+Desde la ficha del pedido, el botón **Enviar por WhatsApp** le manda el enlace listo. La página solo muestra lo pensado para el cliente: pasos, fecha, productos, lo que falta por pagar, novedades y cómo contactarlos. Nunca muestra costos, ganancias ni notas internas.
 
 ## Poner a andar en tu Mac (paso a paso)
 

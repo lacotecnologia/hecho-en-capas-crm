@@ -24,6 +24,7 @@ import {
   Package,
   Printer,
   ImagePlus,
+  MessageCircle,
   Undo2,
   Wallet,
 } from 'lucide-react'
@@ -500,31 +501,10 @@ function Ficha({ p }: { p: PedidoDetalle }) {
                 )}
               </div>
               <div>
-                <p className='text-muted-foreground'>Código de seguimiento</p>
-                <div className='flex items-center gap-2'>
-                  <span className='rounded-md bg-muted px-2 py-1 font-mono text-base font-semibold tracking-wider'>
-                    {p.seguimiento}
-                  </span>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    aria-label='Copiar código'
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(p.seguimiento)
-                        toast.success('Código copiado.')
-                      } catch {
-                        toast.info(`El código es ${p.seguimiento}`)
-                      }
-                    }}
-                  >
-                    <Copy />
-                  </Button>
-                </div>
-                <p className='text-xs text-muted-foreground'>
-                  Con este código el cliente podrá ver su pedido en línea (llega
-                  en la fase 6).
+                <p className='text-muted-foreground'>
+                  Seguimiento para el cliente
                 </p>
+                <EnlaceSeguimiento p={p} />
               </div>
               <Link
                 to='/cotizar/$id'
@@ -1173,5 +1153,62 @@ function FormDevolver({
         </Button>
       </DialogFooter>
     </form>
+  )
+}
+
+const ES_PRUEBA = import.meta.env.VITE_DEMO === '1'
+
+/** Código y enlace público para que el cliente vea su pedido sin login. */
+function EnlaceSeguimiento({ p }: { p: PedidoDetalle }) {
+  const enlace = `${window.location.origin}/seguimiento/${p.seguimiento}`
+  const primerNombre = p.cliente.nombre.split(' ')[0]
+  const mensaje = `Hola ${primerNombre}, aquí puedes ver en qué va tu pedido de Hecho en Capas: ${enlace}`
+  return (
+    <div className='grid gap-2'>
+      <span className='justify-self-start rounded-md bg-muted px-2 py-1 font-mono text-base font-semibold tracking-wider'>
+        {p.seguimiento}
+      </span>
+      <div className='flex flex-wrap gap-2'>
+        {p.cliente.whatsapp && !ES_PRUEBA && (
+          <Button size='sm' asChild>
+            <a
+              href={enlaceWhatsapp(p.cliente.whatsapp, mensaje)}
+              target='_blank'
+              rel='noreferrer'
+            >
+              <MessageCircle /> Enviar por WhatsApp
+            </a>
+          </Button>
+        )}
+        {!ES_PRUEBA && (
+          <Button
+            size='sm'
+            variant='outline'
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(enlace)
+                toast.success(
+                  'Enlace copiado. Pégalo en el chat con el cliente.'
+                )
+              } catch {
+                toast.info(enlace)
+              }
+            }}
+          >
+            <Copy /> Copiar enlace
+          </Button>
+        )}
+        <Button size='sm' variant='ghost' asChild>
+          <Link to='/seguimiento/$codigo' params={{ codigo: p.seguimiento }}>
+            <Eye /> Ver como lo ve el cliente
+          </Link>
+        </Button>
+      </div>
+      <p className='text-xs text-muted-foreground'>
+        {ES_PRUEBA
+          ? 'En la versión de prueba no hay enlace para compartir; en el sistema real sí.'
+          : 'El cliente ve los pasos, la fecha y lo que falta por pagar. No ve costos ni notas internas.'}
+      </p>
+    </div>
   )
 }

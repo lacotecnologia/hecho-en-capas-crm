@@ -75,7 +75,8 @@
   --marca-amarillo: #fed032;
   --marca-naranja: #fba10a;
 
-  --chart-1: #2fb37f;
+  /* Un poco más oscuro que la marca para pasar la prueba de color de gráficas en modo oscuro */
+  --chart-1: #2bab79;
   --chart-2: #f9ae12;
   --chart-3: #b8d85a;
   --chart-4: #fa9a05;

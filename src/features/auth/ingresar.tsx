@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { AvisoPruebaIngreso } from '@/demo/aviso-prueba'
 import { Eye, EyeOff, Loader2, LogIn } from 'lucide-react'
 import { api, mensajeDeError } from '@/lib/api'
@@ -177,6 +177,12 @@ export function Ingresar() {
           setError(null)
         }}
       />
+      <p className='text-center text-sm text-muted-foreground'>
+        ¿Eres cliente?{' '}
+        <Link to='/seguimiento' className='font-medium text-primary underline'>
+          Mira en qué va tu pedido
+        </Link>
+      </p>
     </AuthLayout>
   )
 }

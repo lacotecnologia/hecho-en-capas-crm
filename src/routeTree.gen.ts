@@ -10,7 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as SeguimientoIndexRouteImport } from './routes/seguimiento/index'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as SeguimientoCodigoRouteImport } from './routes/seguimiento/$codigo'
+import { Route as AuthenticatedReportesRouteImport } from './routes/_authenticated/reportes'
 import { Route as AuthenticatedPersonasRouteImport } from './routes/_authenticated/personas'
 import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticated/entregas'
 import { Route as AuthenticatedConfiguracionRouteImport } from './routes/_authenticated/configuracion'
@@ -33,9 +36,24 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SeguimientoIndexRoute = SeguimientoIndexRouteImport.update({
+  id: '/seguimiento/',
+  path: '/seguimiento/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const SeguimientoCodigoRoute = SeguimientoCodigoRouteImport.update({
+  id: '/seguimiento/$codigo',
+  path: '/seguimiento/$codigo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedReportesRoute = AuthenticatedReportesRouteImport.update({
+  id: '/reportes',
+  path: '/reportes',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPersonasRoute = AuthenticatedPersonasRouteImport.update({
@@ -142,6 +160,9 @@ export interface FileRoutesByFullPath {
   '/configuracion': typeof AuthenticatedConfiguracionRoute
   '/entregas': typeof AuthenticatedEntregasRoute
   '/personas': typeof AuthenticatedPersonasRoute
+  '/reportes': typeof AuthenticatedReportesRoute
+  '/seguimiento/$codigo': typeof SeguimientoCodigoRoute
+  '/seguimiento/': typeof SeguimientoIndexRoute
   '/cotizar/$id': typeof AuthenticatedCotizarIdRoute
   '/pedidos/$id': typeof AuthenticatedPedidosIdRoute
   '/cotizar/': typeof AuthenticatedCotizarIndexRoute
@@ -161,7 +182,10 @@ export interface FileRoutesByTo {
   '/configuracion': typeof AuthenticatedConfiguracionRoute
   '/entregas': typeof AuthenticatedEntregasRoute
   '/personas': typeof AuthenticatedPersonasRoute
+  '/reportes': typeof AuthenticatedReportesRoute
+  '/seguimiento/$codigo': typeof SeguimientoCodigoRoute
   '/': typeof AuthenticatedIndexRoute
+  '/seguimiento': typeof SeguimientoIndexRoute
   '/cotizar/$id': typeof AuthenticatedCotizarIdRoute
   '/pedidos/$id': typeof AuthenticatedPedidosIdRoute
   '/cotizar': typeof AuthenticatedCotizarIndexRoute
@@ -183,7 +207,10 @@ export interface FileRoutesById {
   '/_authenticated/configuracion': typeof AuthenticatedConfiguracionRoute
   '/_authenticated/entregas': typeof AuthenticatedEntregasRoute
   '/_authenticated/personas': typeof AuthenticatedPersonasRoute
+  '/_authenticated/reportes': typeof AuthenticatedReportesRoute
+  '/seguimiento/$codigo': typeof SeguimientoCodigoRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/seguimiento/': typeof SeguimientoIndexRoute
   '/_authenticated/cotizar/$id': typeof AuthenticatedCotizarIdRoute
   '/_authenticated/pedidos/$id': typeof AuthenticatedPedidosIdRoute
   '/_authenticated/cotizar/': typeof AuthenticatedCotizarIndexRoute
@@ -206,6 +233,9 @@ export interface FileRouteTypes {
     | '/configuracion'
     | '/entregas'
     | '/personas'
+    | '/reportes'
+    | '/seguimiento/$codigo'
+    | '/seguimiento/'
     | '/cotizar/$id'
     | '/pedidos/$id'
     | '/cotizar/'
@@ -225,7 +255,10 @@ export interface FileRouteTypes {
     | '/configuracion'
     | '/entregas'
     | '/personas'
+    | '/reportes'
+    | '/seguimiento/$codigo'
     | '/'
+    | '/seguimiento'
     | '/cotizar/$id'
     | '/pedidos/$id'
     | '/cotizar'
@@ -246,7 +279,10 @@ export interface FileRouteTypes {
     | '/_authenticated/configuracion'
     | '/_authenticated/entregas'
     | '/_authenticated/personas'
+    | '/_authenticated/reportes'
+    | '/seguimiento/$codigo'
     | '/_authenticated/'
+    | '/seguimiento/'
     | '/_authenticated/cotizar/$id'
     | '/_authenticated/pedidos/$id'
     | '/_authenticated/cotizar/'
@@ -263,6 +299,8 @@ export interface RootRouteChildren {
   errors404Route: typeof errors404Route
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
+  SeguimientoCodigoRoute: typeof SeguimientoCodigoRoute
+  SeguimientoIndexRoute: typeof SeguimientoIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -274,11 +312,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/seguimiento/': {
+      id: '/seguimiento/'
+      path: '/seguimiento'
+      fullPath: '/seguimiento/'
+      preLoaderRoute: typeof SeguimientoIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/': {
       id: '/_authenticated/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/seguimiento/$codigo': {
+      id: '/seguimiento/$codigo'
+      path: '/seguimiento/$codigo'
+      fullPath: '/seguimiento/$codigo'
+      preLoaderRoute: typeof SeguimientoCodigoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/reportes': {
+      id: '/_authenticated/reportes'
+      path: '/reportes'
+      fullPath: '/reportes'
+      preLoaderRoute: typeof AuthenticatedReportesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/personas': {
@@ -409,6 +468,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedConfiguracionRoute: typeof AuthenticatedConfiguracionRoute
   AuthenticatedEntregasRoute: typeof AuthenticatedEntregasRoute
   AuthenticatedPersonasRoute: typeof AuthenticatedPersonasRoute
+  AuthenticatedReportesRoute: typeof AuthenticatedReportesRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedCotizarIdRoute: typeof AuthenticatedCotizarIdRoute
   AuthenticatedPedidosIdRoute: typeof AuthenticatedPedidosIdRoute
@@ -424,6 +484,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedConfiguracionRoute: AuthenticatedConfiguracionRoute,
   AuthenticatedEntregasRoute: AuthenticatedEntregasRoute,
   AuthenticatedPersonasRoute: AuthenticatedPersonasRoute,
+  AuthenticatedReportesRoute: AuthenticatedReportesRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedCotizarIdRoute: AuthenticatedCotizarIdRoute,
   AuthenticatedPedidosIdRoute: AuthenticatedPedidosIdRoute,
@@ -444,6 +505,8 @@ const rootRouteChildren: RootRouteChildren = {
   errors404Route: errors404Route,
   errors500Route: errors500Route,
   errors503Route: errors503Route,
+  SeguimientoCodigoRoute: SeguimientoCodigoRoute,
+  SeguimientoIndexRoute: SeguimientoIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

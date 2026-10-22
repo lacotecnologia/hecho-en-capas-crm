@@ -11,6 +11,7 @@ import {
   Wallet,
   FileText,
   Layers,
+  BarChart3,
 } from 'lucide-react'
 
 export type ItemMenu = {
@@ -89,6 +90,13 @@ export const MENU: GrupoMenu[] = [
         icono: Truck,
         descripcion: 'Domicilios y envíos por transportadora',
         roles: ['admin', 'comercial', 'entregas'],
+      },
+      {
+        titulo: 'Reportes',
+        url: '/reportes',
+        icono: BarChart3,
+        descripcion: 'Ventas, ganancia de cada comercial y lo que falta cobrar',
+        roles: ['admin', 'comercial'],
       },
     ],
   },

@@ -51,7 +51,7 @@ type EstadoDemo = {
   pedidos: PedidosDemo
 }
 
-const CLAVE = 'hec-demo-v5'
+const CLAVE = 'hec-demo-v6'
 const MAX_INTENTOS = 5
 const MINUTOS_BLOQUEO = 15
 
@@ -497,9 +497,15 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
     ruta.startsWith('/pedidos') ||
     ruta.startsWith('/cola') ||
     ruta.startsWith('/entregas') ||
-    ruta === '/cobros'
+    ruta === '/cobros' ||
+    ruta.startsWith('/reportes') ||
+    ruta === '/inicio' ||
+    ruta.startsWith('/seguimiento/')
   ) {
-    const persona = yo(estado)
+    // El seguimiento es público: no pide sesión
+    const persona = ruta.startsWith('/seguimiento/')
+      ? { id: 0, nombre: '', roles: [] }
+      : yo(estado)
     const respuesta = atenderPedidos(
       {
         d: estado.pedidos,
@@ -510,6 +516,7 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
         mensajeros: estado.personas
           .filter((p) => p.activo && p.roles.includes('entregas'))
           .map((p) => ({ id: p.id, nombre: p.nombre })),
+        textos: estado.textos,
       },
       persona,
       ruta,

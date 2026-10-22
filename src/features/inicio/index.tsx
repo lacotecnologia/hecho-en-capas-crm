@@ -1,7 +1,12 @@
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, CalendarCheck } from 'lucide-react'
+import { type Pendiente } from '@shared/inicio'
+import { ArrowRight, CalendarCheck, PartyPopper } from 'lucide-react'
+import { api } from '@/lib/api'
 import { useSesion } from '@/lib/sesion'
+import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { menuPara } from '@/components/layout/data/navegacion'
 import { Pagina } from '@/components/layout/pagina'
 
@@ -24,21 +29,7 @@ export function Inicio() {
       titulo={`${saludo()}, ${primerNombre}`}
       descripcion='¿Qué vas a hacer hoy? Elige una opción.'
     >
-      <Card className='mb-6 bg-accent/60'>
-        <CardContent className='flex items-start gap-4'>
-          <div className='flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground'>
-            <CalendarCheck className='size-5' />
-          </div>
-          <div className='space-y-1'>
-            <h2 className='font-semibold'>Tus pendientes de hoy</h2>
-            <p className='text-muted-foreground'>
-              Aquí verás lo que te toca hoy: cotizaciones por vencer,
-              impresiones por iniciar, cobros y entregas. Se irá llenando a
-              medida que estén listas las secciones.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <Pendientes />
 
       <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
         {accesos.map((item) => (
@@ -67,5 +58,59 @@ export function Inicio() {
         ))}
       </div>
     </Pagina>
+  )
+}
+
+/** Lo que le toca hoy a esta persona, según sus roles. */
+function Pendientes() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['inicio'],
+    queryFn: () => api<{ pendientes: Pendiente[] }>('/inicio'),
+    select: (d) => d.pendientes,
+    refetchInterval: 120_000,
+  })
+  return (
+    <Card className='mb-6 bg-accent/60'>
+      <CardContent className='flex items-start gap-4'>
+        <div className='flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground'>
+          <CalendarCheck className='size-5' />
+        </div>
+        <div className='grid min-w-0 flex-1 gap-2'>
+          <h2 className='font-semibold'>Tus pendientes de hoy</h2>
+          {isLoading && <Skeleton className='h-16 rounded-lg' />}
+          {data && data.length === 0 && (
+            <p className='flex items-center gap-2 text-muted-foreground'>
+              <PartyPopper className='size-4' /> No tienes nada pendiente. ¡Todo
+              al día!
+            </p>
+          )}
+          {data && data.length > 0 && (
+            <ul className='grid gap-1.5'>
+              {data.map((p) => (
+                <li key={p.texto}>
+                  <Link
+                    to={p.url}
+                    className='group flex items-center gap-3 rounded-lg bg-background/70 px-3 py-2 transition-colors hover:bg-background'
+                  >
+                    <span
+                      className={cn(
+                        'flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-sm font-bold tabular-nums',
+                        p.tono === 'urgente'
+                          ? 'bg-marca-naranja text-white'
+                          : 'bg-primary/15 text-primary'
+                      )}
+                    >
+                      {p.cantidad}
+                    </span>
+                    <span className='flex-1'>{p.texto}</span>
+                    <ArrowRight className='size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5' />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
