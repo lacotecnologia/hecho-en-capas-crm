@@ -236,10 +236,15 @@ const SIN_PERMISO =
   'No tienes permiso para hacer esto. Pídeselo al administrador.'
 const NO_EXISTE = 'No encontramos ese producto. Puede que lo hayan borrado.'
 
-function resumen(t: TallerDemo, p: ProductoDemo): ProductoResumen {
+/** Foto principal del producto (o null). */
+export function portadaDe(t: TallerDemo, productoId: number) {
   const fotos = t.archivos
-    .filter((a) => a.productoId === p.id && a.tipo === 'imagen')
+    .filter((a) => a.productoId === productoId && a.tipo === 'imagen')
     .sort((a, b) => Number(b.esPortada) - Number(a.esPortada))
+  return fotos[0]?.url ?? null
+}
+
+function resumen(t: TallerDemo, p: ProductoDemo): ProductoResumen {
   return {
     id: p.id,
     sku: p.sku,
@@ -252,7 +257,7 @@ function resumen(t: TallerDemo, p: ProductoDemo): ProductoResumen {
     precioFabrica: p.precioFabrica,
     diasFabricacion: p.diasFabricacion,
     stock: p.stock,
-    portada: fotos[0]?.url ?? null,
+    portada: portadaDe(t, p.id),
     actualizadoEn: p.actualizadoEn,
   }
 }

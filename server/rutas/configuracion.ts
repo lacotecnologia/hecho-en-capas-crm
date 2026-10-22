@@ -1,7 +1,10 @@
 import { Hono } from 'hono'
 import {
   CAMPOS_CONFIG,
+  TEXTOS_CONFIG,
+  textosPorDefecto,
   valoresPorDefecto,
+  type TextosConfig,
   type ValoresConfig,
 } from '../../shared/configuracion.js'
 import { getDb } from '../db/index.js'
@@ -22,11 +25,25 @@ export async function leerConfiguracion(): Promise<ValoresConfig> {
   return valores
 }
 
+/** Textos del negocio (WhatsApp, datos de pago, condiciones...). */
+export async function leerTextos(): Promise<TextosConfig> {
+  const filas = await getDb().select().from(configuracion)
+  const textos = textosPorDefecto()
+  for (const fila of filas) {
+    if (typeof fila.valor === 'string' && fila.clave in textos) {
+      textos[fila.clave] = fila.valor
+    }
+  }
+  return textos
+}
+
+async function todo() {
+  return { valores: await leerConfiguracion(), textos: await leerTextos() }
+}
+
 // Todas las personas pueden leer los valores (el comercial necesita el tope,
 // el taller las tarifas...). Solo el Admin puede cambiarlos.
-rutasConfiguracion.get('/', async (c) =>
-  c.json({ valores: await leerConfiguracion() })
-)
+rutasConfiguracion.get('/', async (c) => c.json(await todo()))
 
 rutasConfiguracion.put('/', soloRoles('admin'), async (c) => {
   const cuerpo = await c.req.json().catch(() => ({}))
@@ -41,6 +58,27 @@ rutasConfiguracion.put('/', soloRoles('admin'), async (c) => {
       return c.json(
         {
           mensaje: `"${campo.etiqueta}" debe estar entre ${campo.min} y ${campo.max}.`,
+          campo: campo.clave,
+        },
+        400
+      )
+    }
+    filas.push({
+      clave: campo.clave,
+      valor,
+      actualizadoEn: new Date(),
+      actualizadoPor: yo.id,
+    })
+  }
+
+  const textos = (cuerpo.textos ?? {}) as Record<string, unknown>
+  for (const campo of TEXTOS_CONFIG) {
+    if (!(campo.clave in textos)) continue
+    const valor = String(textos[campo.clave] ?? '').trim()
+    if (valor.length > campo.max) {
+      return c.json(
+        {
+          mensaje: `"${campo.etiqueta}" es muy largo: máximo ${campo.max} letras.`,
           campo: campo.clave,
         },
         400
@@ -75,5 +113,5 @@ rutasConfiguracion.put('/', soloRoles('admin'), async (c) => {
     }
   })
 
-  return c.json({ valores: await leerConfiguracion() })
+  return c.json(await todo())
 })

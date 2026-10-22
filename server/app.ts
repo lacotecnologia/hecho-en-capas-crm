@@ -2,7 +2,9 @@ import { Hono } from 'hono'
 import { sql } from 'drizzle-orm'
 import { getDb } from './db/index.js'
 import { rutasAuth } from './rutas/auth.js'
+import { rutasClientes } from './rutas/clientes.js'
 import { rutasConfiguracion } from './rutas/configuracion.js'
+import { rutasCotizaciones } from './rutas/cotizaciones.js'
 import { rutasTaller } from './rutas/taller.js'
 import { rutasUsuarios } from './rutas/usuarios.js'
 import { type Variables } from './sesion.js'
@@ -27,6 +29,8 @@ app.route('/auth', rutasAuth)
 app.route('/usuarios', rutasUsuarios)
 app.route('/configuracion', rutasConfiguracion)
 app.route('/taller', rutasTaller)
+app.route('/clientes', rutasClientes)
+app.route('/cotizaciones', rutasCotizaciones)
 
 app.notFound((c) => c.json({ mensaje: 'Esta dirección no existe.' }, 404))
 

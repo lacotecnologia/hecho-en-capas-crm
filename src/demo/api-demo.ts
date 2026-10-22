@@ -7,11 +7,20 @@
  */
 import {
   CAMPOS_CONFIG,
+  TEXTOS_CONFIG,
+  textosPorDefecto,
+  type TextosConfig,
   valoresPorDefecto,
   type ValoresConfig,
 } from '@shared/configuracion'
+import { precioMaximoComercial } from '@shared/costos'
 import { esRol, type Rol } from '@shared/roles'
 import { ApiError } from '@/lib/api'
+import {
+  atenderCotizar,
+  cotizarInicial,
+  type CotizarDemo,
+} from './cotizar-demo'
 import { atenderTaller, tallerInicial, type TallerDemo } from './taller-demo'
 
 type PersonaDemo = {
@@ -29,11 +38,13 @@ type PersonaDemo = {
 type EstadoDemo = {
   personas: PersonaDemo[]
   config: ValoresConfig
+  textos: TextosConfig
   sesion: number | null
   taller: TallerDemo
+  cotizar: CotizarDemo
 }
 
-const CLAVE = 'hec-demo-v2'
+const CLAVE = 'hec-demo-v3'
 const MAX_INTENTOS = 5
 const MINUTOS_BLOQUEO = 15
 
@@ -56,15 +67,63 @@ function inicial(): EstadoDemo {
     bloqueadoHasta: null,
     creadoEn: ahora,
   })
-  return {
+  const estado: EstadoDemo = {
     personas: [
       p(1, 'Luis', 'luis', '1234', ['admin']),
       p(2, 'Ana María', 'ana', '4821', ['comercial']),
       p(3, 'Carlos Gómez', 'carlos', '5678', ['fabricacion', 'entregas']),
     ],
     config: valoresPorDefecto(),
+    textos: {
+      ...textosPorDefecto(),
+      negocio_whatsapp: '300 555 1234',
+      negocio_email: 'hola@hechoencapas.co',
+    },
     sesion: null,
     taller: tallerInicial(valoresPorDefecto()),
+    cotizar: cotizarInicial(),
+  }
+  ejemploCotizacion(estado)
+  return estado
+}
+
+/** Una cotización enviada de ejemplo, para que la lista no arranque vacía. */
+function ejemploCotizacion(estado: EstadoDemo) {
+  const tarjeta = estado.taller.productos.find((p) => p.id === 2)
+  if (!tarjeta || tarjeta.precioFabrica <= 0) return
+  const ana = estado.personas[1]
+  const llamar = (ruta: string, cuerpo: Record<string, unknown> = {}) =>
+    atenderCotizar(
+      estado.cotizar,
+      estado.taller,
+      estado.config,
+      new Map(estado.personas.map((p) => [p.id, p.nombre])),
+      ana,
+      ruta,
+      'POST',
+      cuerpo
+    ) as { cotizacion: { id: number } }
+  try {
+    const { cotizacion } = llamar('/cotizaciones', {
+      clienteId: 1,
+      modalidad: 'local',
+      lineas: [
+        {
+          productoId: 2,
+          cantidad: 50,
+          precioVenta: precioMaximoComercial(
+            tarjeta.precioFabrica,
+            estado.config.tope_comercial
+          ),
+        },
+      ],
+      cargos: [{ concepto: 'Envío', valor: 8000 }],
+      descuento: 0,
+      notas: 'Tarjetas con el logo del café en los colores de la marca.',
+    })
+    llamar(`/cotizaciones/${cotizacion.id}/enviar`)
+  } catch {
+    // Si los datos de ejemplo cambian, la demo arranca sin cotización.
   }
 }
 
@@ -221,7 +280,7 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
   // ---- Configuración ----
   if (ruta === '/configuracion' && metodo === 'GET') {
     yo(estado)
-    return { valores: estado.config }
+    return { valores: estado.config, textos: estado.textos }
   }
 
   if (ruta === '/configuracion' && metodo === 'PUT') {
@@ -241,8 +300,22 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
       estado.config[campo.clave] = valor
       cambios++
     }
+    const textos = (c.textos ?? {}) as Record<string, unknown>
+    for (const campo of TEXTOS_CONFIG) {
+      if (!(campo.clave in textos)) continue
+      const valor = String(textos[campo.clave] ?? '').trim()
+      if (valor.length > campo.max) {
+        fallo(
+          400,
+          `"${campo.etiqueta}" es muy largo: máximo ${campo.max} letras.`,
+          campo.clave
+        )
+      }
+      estado.textos[campo.clave] = valor
+      cambios++
+    }
     if (cambios === 0) fallo(400, 'No hay cambios para guardar.')
-    return { valores: estado.config }
+    return { valores: estado.config, textos: estado.textos }
   }
 
   // ---- Personas ----
@@ -342,6 +415,22 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
       estado.taller,
       estado.config,
       persona.roles,
+      ruta,
+      metodo,
+      c
+    )
+    if (respuesta !== undefined) return respuesta
+  }
+
+  // ---- Clientes y cotizaciones ----
+  if (ruta.startsWith('/clientes') || ruta.startsWith('/cotizaciones')) {
+    const persona = yo(estado)
+    const respuesta = atenderCotizar(
+      estado.cotizar,
+      estado.taller,
+      estado.config,
+      new Map(estado.personas.map((p) => [p.id, p.nombre])),
+      persona,
       ruta,
       metodo,
       c

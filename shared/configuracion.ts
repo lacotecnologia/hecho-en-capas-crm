@@ -151,3 +151,66 @@ export type ValoresConfig = Record<string, number>
 export function valoresPorDefecto(): ValoresConfig {
   return Object.fromEntries(CAMPOS_CONFIG.map((c) => [c.clave, c.porDefecto]))
 }
+
+// ---------- Datos de texto del negocio (salen en el PDF) ----------
+
+export type CampoTexto = {
+  clave: string
+  etiqueta: string
+  ayuda: string
+  porDefecto: string
+  /** true = caja de varias líneas */
+  largo?: boolean
+  max: number
+}
+
+export const TEXTOS_CONFIG: CampoTexto[] = [
+  {
+    clave: 'negocio_whatsapp',
+    etiqueta: 'WhatsApp del negocio',
+    ayuda: 'Sale en el PDF para que el cliente escriba.',
+    porDefecto: '',
+    max: 30,
+  },
+  {
+    clave: 'negocio_email',
+    etiqueta: 'Correo del negocio',
+    ayuda: 'Opcional. Sale en el PDF.',
+    porDefecto: '',
+    max: 80,
+  },
+  {
+    clave: 'negocio_ciudad',
+    etiqueta: 'Ciudad',
+    ayuda: 'Desde dónde se despacha.',
+    porDefecto: 'Pereira, Risaralda',
+    max: 60,
+  },
+  {
+    clave: 'datos_pago',
+    etiqueta: 'Datos para pagar',
+    ayuda: 'Nequi, Daviplata o cuentas. Salen al final del PDF.',
+    porDefecto:
+      'Nequi / Daviplata: (escribe el número)\nTransferencia: (banco, tipo y número de cuenta)',
+    largo: true,
+    max: 600,
+  },
+  {
+    clave: 'condiciones',
+    etiqueta: 'Condiciones de la cotización',
+    ayuda: 'Una por línea. Salen en el PDF.',
+    porDefecto: [
+      'Los colores pueden variar un poco frente a lo que se ve en pantalla.',
+      'Los cambios de diseño después de aprobar pueden cambiar el precio y la fecha de entrega.',
+      'En productos personalizados se pide un anticipo para empezar; no se devuelve una vez iniciada la impresión.',
+    ].join('\n'),
+    largo: true,
+    max: 1500,
+  },
+]
+
+export type TextosConfig = Record<string, string>
+
+export function textosPorDefecto(): TextosConfig {
+  return Object.fromEntries(TEXTOS_CONFIG.map((c) => [c.clave, c.porDefecto]))
+}

@@ -1,5 +1,4 @@
 import { del } from '@vercel/blob'
-import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { calcularCosto } from '../../shared/costos.js'
@@ -24,6 +23,7 @@ import {
   productos,
 } from '../db/schema.js'
 import { conSesion, soloRoles, type Variables } from '../sesion.js'
+import { permisoDeSubida, urlDeBlobValida } from '../subidas.js'
 import { leerConfiguracion } from './configuracion.js'
 
 export const rutasTaller = new Hono<{ Variables: Variables }>()
@@ -335,58 +335,7 @@ rutasTaller.post('/productos/:id/stock', deTaller, async (c) => {
 
 // ===================== Archivos =====================
 
-const TIPOS_PERMITIDOS = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'model/3mf',
-  'model/stl',
-  'application/vnd.ms-pki.stl',
-  'application/sla',
-  'application/octet-stream',
-  'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
-]
-
-/** Entrega al navegador un permiso temporal para subir un archivo a Vercel Blob. */
-rutasTaller.post('/subida', deTaller, async (c) => {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return c.json(
-      {
-        mensaje:
-          'Falta configurar el almacenamiento de archivos. El administrador debe crear un Blob Store en Vercel y conectarlo al proyecto.',
-      },
-      503
-    )
-  }
-  const cuerpo = (await c.req.json()) as HandleUploadBody
-  try {
-    const respuesta = await handleUpload({
-      body: cuerpo,
-      request: c.req.raw,
-      onBeforeGenerateToken: async () => ({
-        allowedContentTypes: TIPOS_PERMITIDOS,
-        maximumSizeInBytes: 100 * 1024 * 1024,
-        addRandomSuffix: true,
-      }),
-    })
-    return c.json(respuesta)
-  } catch (error) {
-    console.error('[subida]', error)
-    return c.json(
-      { mensaje: 'No se pudo preparar la subida del archivo. Intenta de nuevo.' },
-      400
-    )
-  }
-})
-
-function urlDeBlobValida(url: string) {
-  try {
-    const u = new URL(url)
-    return u.protocol === 'https:' && u.hostname.endsWith('.blob.vercel-storage.com')
-  } catch {
-    return false
-  }
-}
+rutasTaller.post('/subida', deTaller, (c) => permisoDeSubida(c))
 
 rutasTaller.post('/productos/:id/archivos', deTaller, async (c) => {
   const id = idDe(c.req.param('id'))

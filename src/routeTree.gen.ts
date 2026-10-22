@@ -14,7 +14,6 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedPersonasRouteImport } from './routes/_authenticated/personas'
 import { Route as AuthenticatedPedidosRouteImport } from './routes/_authenticated/pedidos'
 import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticated/entregas'
-import { Route as AuthenticatedCotizarRouteImport } from './routes/_authenticated/cotizar'
 import { Route as AuthenticatedConfiguracionRouteImport } from './routes/_authenticated/configuracion'
 import { Route as AuthenticatedCobrosRouteImport } from './routes/_authenticated/cobros'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
@@ -24,6 +23,8 @@ import { Route as errors403RouteImport } from './routes/(errors)/403'
 import { Route as errors401RouteImport } from './routes/(errors)/401'
 import { Route as authIngresarRouteImport } from './routes/(auth)/ingresar'
 import { Route as AuthenticatedTallerIndexRouteImport } from './routes/_authenticated/taller/index'
+import { Route as AuthenticatedCotizarIndexRouteImport } from './routes/_authenticated/cotizar/index'
+import { Route as AuthenticatedCotizarIdRouteImport } from './routes/_authenticated/cotizar/$id'
 import { Route as AuthenticatedTallerProductosIdRouteImport } from './routes/_authenticated/taller/productos/$id'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -48,11 +49,6 @@ const AuthenticatedPedidosRoute = AuthenticatedPedidosRouteImport.update({
 const AuthenticatedEntregasRoute = AuthenticatedEntregasRouteImport.update({
   id: '/entregas',
   path: '/entregas',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedCotizarRoute = AuthenticatedCotizarRouteImport.update({
-  id: '/cotizar',
-  path: '/cotizar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedConfiguracionRoute =
@@ -102,6 +98,17 @@ const AuthenticatedTallerIndexRoute =
     path: '/taller/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCotizarIndexRoute =
+  AuthenticatedCotizarIndexRouteImport.update({
+    id: '/cotizar/',
+    path: '/cotizar/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedCotizarIdRoute = AuthenticatedCotizarIdRouteImport.update({
+  id: '/cotizar/$id',
+  path: '/cotizar/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedTallerProductosIdRoute =
   AuthenticatedTallerProductosIdRouteImport.update({
     id: '/taller/productos/$id',
@@ -119,10 +126,11 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/cobros': typeof AuthenticatedCobrosRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
-  '/cotizar': typeof AuthenticatedCotizarRoute
   '/entregas': typeof AuthenticatedEntregasRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/personas': typeof AuthenticatedPersonasRoute
+  '/cotizar/$id': typeof AuthenticatedCotizarIdRoute
+  '/cotizar/': typeof AuthenticatedCotizarIndexRoute
   '/taller/': typeof AuthenticatedTallerIndexRoute
   '/taller/productos/$id': typeof AuthenticatedTallerProductosIdRoute
 }
@@ -135,11 +143,12 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/cobros': typeof AuthenticatedCobrosRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
-  '/cotizar': typeof AuthenticatedCotizarRoute
   '/entregas': typeof AuthenticatedEntregasRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/personas': typeof AuthenticatedPersonasRoute
   '/': typeof AuthenticatedIndexRoute
+  '/cotizar/$id': typeof AuthenticatedCotizarIdRoute
+  '/cotizar': typeof AuthenticatedCotizarIndexRoute
   '/taller': typeof AuthenticatedTallerIndexRoute
   '/taller/productos/$id': typeof AuthenticatedTallerProductosIdRoute
 }
@@ -154,11 +163,12 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/cobros': typeof AuthenticatedCobrosRoute
   '/_authenticated/configuracion': typeof AuthenticatedConfiguracionRoute
-  '/_authenticated/cotizar': typeof AuthenticatedCotizarRoute
   '/_authenticated/entregas': typeof AuthenticatedEntregasRoute
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
   '/_authenticated/personas': typeof AuthenticatedPersonasRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/cotizar/$id': typeof AuthenticatedCotizarIdRoute
+  '/_authenticated/cotizar/': typeof AuthenticatedCotizarIndexRoute
   '/_authenticated/taller/': typeof AuthenticatedTallerIndexRoute
   '/_authenticated/taller/productos/$id': typeof AuthenticatedTallerProductosIdRoute
 }
@@ -174,10 +184,11 @@ export interface FileRouteTypes {
     | '/503'
     | '/cobros'
     | '/configuracion'
-    | '/cotizar'
     | '/entregas'
     | '/pedidos'
     | '/personas'
+    | '/cotizar/$id'
+    | '/cotizar/'
     | '/taller/'
     | '/taller/productos/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -190,11 +201,12 @@ export interface FileRouteTypes {
     | '/503'
     | '/cobros'
     | '/configuracion'
-    | '/cotizar'
     | '/entregas'
     | '/pedidos'
     | '/personas'
     | '/'
+    | '/cotizar/$id'
+    | '/cotizar'
     | '/taller'
     | '/taller/productos/$id'
   id:
@@ -208,11 +220,12 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/cobros'
     | '/_authenticated/configuracion'
-    | '/_authenticated/cotizar'
     | '/_authenticated/entregas'
     | '/_authenticated/pedidos'
     | '/_authenticated/personas'
     | '/_authenticated/'
+    | '/_authenticated/cotizar/$id'
+    | '/_authenticated/cotizar/'
     | '/_authenticated/taller/'
     | '/_authenticated/taller/productos/$id'
   fileRoutesById: FileRoutesById
@@ -262,13 +275,6 @@ declare module '@tanstack/react-router' {
       path: '/entregas'
       fullPath: '/entregas'
       preLoaderRoute: typeof AuthenticatedEntregasRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/cotizar': {
-      id: '/_authenticated/cotizar'
-      path: '/cotizar'
-      fullPath: '/cotizar'
-      preLoaderRoute: typeof AuthenticatedCotizarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/configuracion': {
@@ -334,6 +340,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTallerIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/cotizar/': {
+      id: '/_authenticated/cotizar/'
+      path: '/cotizar'
+      fullPath: '/cotizar/'
+      preLoaderRoute: typeof AuthenticatedCotizarIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/cotizar/$id': {
+      id: '/_authenticated/cotizar/$id'
+      path: '/cotizar/$id'
+      fullPath: '/cotizar/$id'
+      preLoaderRoute: typeof AuthenticatedCotizarIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/taller/productos/$id': {
       id: '/_authenticated/taller/productos/$id'
       path: '/taller/productos/$id'
@@ -347,11 +367,12 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCobrosRoute: typeof AuthenticatedCobrosRoute
   AuthenticatedConfiguracionRoute: typeof AuthenticatedConfiguracionRoute
-  AuthenticatedCotizarRoute: typeof AuthenticatedCotizarRoute
   AuthenticatedEntregasRoute: typeof AuthenticatedEntregasRoute
   AuthenticatedPedidosRoute: typeof AuthenticatedPedidosRoute
   AuthenticatedPersonasRoute: typeof AuthenticatedPersonasRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedCotizarIdRoute: typeof AuthenticatedCotizarIdRoute
+  AuthenticatedCotizarIndexRoute: typeof AuthenticatedCotizarIndexRoute
   AuthenticatedTallerIndexRoute: typeof AuthenticatedTallerIndexRoute
   AuthenticatedTallerProductosIdRoute: typeof AuthenticatedTallerProductosIdRoute
 }
@@ -359,11 +380,12 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCobrosRoute: AuthenticatedCobrosRoute,
   AuthenticatedConfiguracionRoute: AuthenticatedConfiguracionRoute,
-  AuthenticatedCotizarRoute: AuthenticatedCotizarRoute,
   AuthenticatedEntregasRoute: AuthenticatedEntregasRoute,
   AuthenticatedPedidosRoute: AuthenticatedPedidosRoute,
   AuthenticatedPersonasRoute: AuthenticatedPersonasRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedCotizarIdRoute: AuthenticatedCotizarIdRoute,
+  AuthenticatedCotizarIndexRoute: AuthenticatedCotizarIndexRoute,
   AuthenticatedTallerIndexRoute: AuthenticatedTallerIndexRoute,
   AuthenticatedTallerProductosIdRoute: AuthenticatedTallerProductosIdRoute,
 }

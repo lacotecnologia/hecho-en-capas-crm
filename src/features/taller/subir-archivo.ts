@@ -17,7 +17,7 @@ export function tipoDeArchivo(
 }
 
 /** Reduce una foto a un tamaño razonable antes de subirla (WebP). */
-async function reducirImagen(archivo: File, ladoMax: number, calidad: number) {
+export async function reducirImagen(archivo: File, ladoMax: number, calidad: number) {
   const bitmap = await createImageBitmap(archivo)
   const escala = Math.min(1, ladoMax / Math.max(bitmap.width, bitmap.height))
   const canvas = document.createElement('canvas')
@@ -34,7 +34,7 @@ async function reducirImagen(archivo: File, ladoMax: number, calidad: number) {
   )
 }
 
-function comoDataUrl(blob: Blob) {
+export function comoDataUrl(blob: Blob) {
   return new Promise<string>((resolver) => {
     const lector = new FileReader()
     lector.onload = () => resolver(String(lector.result))

@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   CAMPOS_CONFIG,
   GRUPOS_CONFIG,
+  TEXTOS_CONFIG,
   type CampoConfig,
   type GrupoConfig,
-  type ValoresConfig,
 } from '@shared/configuracion'
 import { Loader2, Save, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -21,8 +21,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
 import { Pagina } from '@/components/layout/pagina'
-import { consultaConfiguracion } from './api'
+import {
+  type ConfiguracionCompleta,
+  consultaConfiguracionCompleta,
+} from './api'
 
 const DESCRIPCION_GRUPO: Record<GrupoConfig, string> = {
   costos:
@@ -38,7 +42,19 @@ const formato = new Intl.NumberFormat('es-CO')
 
 export function Configuracion() {
   const queryClient = useQueryClient()
-  const { data: guardados, isLoading } = useQuery(consultaConfiguracion)
+  const { data: completo, isLoading } = useQuery(consultaConfiguracionCompleta)
+  const guardados = completo?.valores
+  const textosGuardados = completo?.textos
+  const [edicionesTexto, setEdicionesTexto] = useState<Record<string, string>>(
+    {}
+  )
+  const textos = useMemo(
+    () => ({ ...(textosGuardados ?? {}), ...edicionesTexto }),
+    [textosGuardados, edicionesTexto]
+  )
+  const textosCambiados = TEXTOS_CONFIG.filter(
+    (c) => textosGuardados && textos[c.clave] !== textosGuardados[c.clave]
+  )
   // Solo se guardan en estado los campos que la persona ha tocado;
   // el resto se muestra tal como viene del servidor.
   const [ediciones, setEdiciones] = useState<Record<string, string>>({})
@@ -78,25 +94,30 @@ export function Configuracion() {
 
   const guardar = useMutation({
     mutationFn: () =>
-      api<{ valores: ValoresConfig }>('/configuracion', {
+      api<ConfiguracionCompleta>('/configuracion', {
         method: 'PUT',
         body: {
           valores: Object.fromEntries(
             cambiados.map((c) => [c.clave, Number(valores[c.clave])])
           ),
+          textos: Object.fromEntries(
+            textosCambiados.map((c) => [c.clave, textos[c.clave]])
+          ),
         },
       }),
     onSuccess: (datos) => {
-      queryClient.setQueryData(consultaConfiguracion.queryKey, datos)
+      queryClient.setQueryData(consultaConfiguracionCompleta.queryKey, datos)
       setEdiciones({})
+      setEdicionesTexto({})
       toast.success(
-        cambiados.length === 1
+        totalCambios === 1
           ? 'Cambio guardado. Se usará desde ahora en adelante.'
-          : `${cambiados.length} cambios guardados. Se usarán desde ahora en adelante.`
+          : `${totalCambios} cambios guardados. Se usarán desde ahora en adelante.`
       )
     },
   })
 
+  const totalCambios = cambiados.length + textosCambiados.length
   const hayErrores = Object.keys(errores).length > 0
   const grupos = Object.keys(GRUPOS_CONFIG) as GrupoConfig[]
 
@@ -116,7 +137,7 @@ export function Configuracion() {
           className='grid gap-6 pb-24'
           onSubmit={(e) => {
             e.preventDefault()
-            if (!hayErrores && cambiados.length > 0) guardar.mutate()
+            if (!hayErrores && totalCambios > 0) guardar.mutate()
           }}
         >
           {grupos.map((grupo) => (
@@ -144,27 +165,78 @@ export function Configuracion() {
             </Card>
           ))}
 
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-lg'>Datos del negocio</CardTitle>
+              <CardDescription>
+                Salen en el PDF de cada cotización.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className='grid gap-6 md:grid-cols-2'>
+              {TEXTOS_CONFIG.map((campo) => {
+                const id = `texto-${campo.clave}`
+                const cambiado = textosCambiados.includes(campo)
+                const valor = textos[campo.clave] ?? ''
+                const cambiar = (v: string) =>
+                  setEdicionesTexto((p) => ({ ...p, [campo.clave]: v }))
+                return (
+                  <div
+                    key={campo.clave}
+                    className={`grid content-start gap-2 ${campo.largo ? 'md:col-span-2' : ''}`}
+                  >
+                    <Label htmlFor={id} className='flex items-center gap-2'>
+                      {campo.etiqueta}
+                      {cambiado && (
+                        <span className='rounded-full bg-marca-amarillo/40 px-2 text-xs font-normal'>
+                          sin guardar
+                        </span>
+                      )}
+                    </Label>
+                    {campo.largo ? (
+                      <Textarea
+                        id={id}
+                        rows={4}
+                        value={valor}
+                        maxLength={campo.max}
+                        onChange={(e) => cambiar(e.target.value)}
+                      />
+                    ) : (
+                      <Input
+                        id={id}
+                        value={valor}
+                        maxLength={campo.max}
+                        onChange={(e) => cambiar(e.target.value)}
+                      />
+                    )}
+                    <p className='text-sm text-muted-foreground'>{campo.ayuda}</p>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+
           <div className='sticky bottom-4 z-10 flex flex-wrap items-center justify-end gap-3 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur'>
             <p className='me-auto text-sm text-muted-foreground'>
-              {cambiados.length === 0
+              {totalCambios === 0
                 ? 'No hay cambios sin guardar.'
-                : cambiados.length === 1
+                : totalCambios === 1
                   ? 'Tienes 1 cambio sin guardar.'
-                  : `Tienes ${cambiados.length} cambios sin guardar.`}
+                  : `Tienes ${totalCambios} cambios sin guardar.`}
             </p>
             <Button
               type='button'
               variant='outline'
-              disabled={cambiados.length === 0 || guardar.isPending}
-              onClick={() => setEdiciones({})}
+              disabled={totalCambios === 0 || guardar.isPending}
+              onClick={() => {
+                setEdiciones({})
+                setEdicionesTexto({})
+              }}
             >
               <Undo2 /> Deshacer
             </Button>
             <Button
               type='submit'
-              disabled={
-                cambiados.length === 0 || hayErrores || guardar.isPending
-              }
+              disabled={totalCambios === 0 || hayErrores || guardar.isPending}
             >
               {guardar.isPending ? (
                 <Loader2 className='animate-spin' />
