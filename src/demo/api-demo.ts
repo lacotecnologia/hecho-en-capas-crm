@@ -274,6 +274,10 @@ export async function apiDemo<T>(
 
 function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
   // ---- Sesión ----
+  // En la prueba ya existen personas, así que nunca se pide el primer ingreso.
+  if (ruta === '/auth/primer-ingreso' && metodo === 'GET') {
+    return { necesario: false }
+  }
   if (ruta === '/auth/ingresar' && metodo === 'POST') {
     const usuario = String(c.usuario ?? '')
       .trim()

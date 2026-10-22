@@ -16,7 +16,7 @@
     "test:browser": "vitest",
     "test:coverage": "vitest run --coverage --browser.headless",
     "db:generar": "drizzle-kit generate",
-    "db:migrar": "drizzle-kit migrate",
+    "db:migrar": "tsx scripts/migrar.ts",
     "crear-admin": "tsx scripts/crear-admin.ts",
     "dev:prueba": "VITE_DEMO=1 vite",
     "build:prueba": "VITE_DEMO=1 vite build --base ./ --outDir dist-prueba"

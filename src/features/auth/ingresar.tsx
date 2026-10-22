@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { AvisoPruebaIngreso } from '@/demo/aviso-prueba'
 import { Eye, EyeOff, Loader2, LogIn } from 'lucide-react'
@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { AuthLayout } from './auth-layout'
+import { consultaPrimerIngreso, PrimerIngreso } from './primer-ingreso'
 
 const esquema = z.object({
   usuario: z.string().trim().min(1, 'Escribe tu usuario.'),
@@ -47,6 +48,7 @@ export function Ingresar() {
   const queryClient = useQueryClient()
   const [verPin, setVerPin] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const primerIngreso = useQuery(consultaPrimerIngreso)
 
   const form = useForm<Datos>({
     resolver: zodResolver(esquema),
@@ -77,6 +79,14 @@ export function Ingresar() {
   }
 
   const enviando = form.formState.isSubmitting
+
+  if (primerIngreso.data?.necesario) {
+    return (
+      <AuthLayout>
+        <PrimerIngreso />
+      </AuthLayout>
+    )
+  }
 
   return (
     <AuthLayout>
