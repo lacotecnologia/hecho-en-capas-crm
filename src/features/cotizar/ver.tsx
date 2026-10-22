@@ -32,6 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Campo } from '@/components/campo'
 import { Pagina } from '@/components/layout/pagina'
+import { ConvertirEnPedido } from '@/features/pedidos/convertir'
 import { formatoPesos } from '@/features/taller/formato'
 import { accionCotizacion, consultaCotizacion } from './api'
 import { EditorCotizacion, Volver } from './editor'
@@ -86,7 +87,7 @@ const AVISO: Record<string, { texto: string; clase: string }> = {
   },
   aprobada: {
     texto:
-      '¡El cliente aceptó! En la próxima fase podrás convertirla en pedido con un botón.',
+      '¡El cliente aceptó! Conviértela en pedido para que el taller empiece.',
     clase: 'bg-primary/10',
   },
   rechazada: {
@@ -131,7 +132,9 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
         )
         navigate({ to: '/cotizar/$id', params: { id: String(nueva.id) } })
       } else if (a.tipo === 'aprobar') {
-        toast.success('¡Bien! Quedó como aprobada.')
+        toast.success(
+          '¡Bien! Quedó como aprobada. Ahora conviértela en pedido.'
+        )
       } else {
         toast.success('Quedó como no aceptada.')
       }
@@ -160,7 +163,11 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
               <TriangleAlert className='mt-0.5 size-5 shrink-0' />
             )}
             <div className='grid gap-1'>
-              <p className='font-medium'>{aviso.texto}</p>
+              <p className='font-medium'>
+                {c.pedido
+                  ? `El cliente aceptó y ya es el pedido ${c.pedido.codigo}.`
+                  : aviso.texto}
+              </p>
               {c.enviadaEn && (
                 <p className='text-sm text-muted-foreground'>
                   Enviada el {formatoFecha(c.enviadaEn)}
@@ -300,6 +307,7 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
           </Card>
 
           <div className='grid gap-2'>
+            <ConvertirEnPedido cotizacion={c} puede={puedeDecidir} />
             {puedeDecidir && c.estado === 'enviada' && (
               <Button
                 size='lg'

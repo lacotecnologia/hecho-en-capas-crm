@@ -132,6 +132,8 @@ export type CotizacionDetalle = Omit<CotizacionResumen, 'cliente' | 'lineas'> & 
   resumen: ResumenCotizacion
   /** Id de la versión siguiente, si esta fue cambiada. */
   reemplazadaPor: number | null
+  /** El pedido que salió de esta cotización, si ya se convirtió. */
+  pedido: { id: number; codigo: string } | null
 }
 
 // ---------- Cálculos ----------

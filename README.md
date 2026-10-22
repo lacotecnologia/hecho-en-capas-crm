@@ -14,7 +14,7 @@ Sistema interno para llevar cotizaciones, pedidos, taller (fabricación), cobros
 | 1. Base              | Login con usuario + PIN, roles, Personas, Configuración, marca | ✅ Lista  |
 | 2. Taller I          | Impresoras, bobinas, catálogo y precio de fábrica              | ✅ Lista  |
 | 3. Cotizar           | Clientes, cotizador con cálculos, PDF, versiones y respuestas  | ✅ Lista  |
-| 4. Pedidos           | Pedidos y cola de impresión                                    | Pendiente |
+| 4. Pedidos           | Pedidos, anticipo y cola de impresión por impresora            | ✅ Lista  |
 | 5. Cobros y Entregas | Pagos, saldos, domicilios y envíos                             | Pendiente |
 | 6. Seguimiento       | Página pública para el cliente y reportes                      | Pendiente |
 

@@ -22,6 +22,7 @@ import {
   cotizacionImagenes,
   cotizacionLineas,
   cotizaciones,
+  pedidos,
   productoArchivos,
   productos,
   usuarios,
@@ -105,6 +106,10 @@ async function detalle(cot: FilaCot, u: UsuarioSesion): Promise<CotizacionDetall
     .select({ id: cotizaciones.id })
     .from(cotizaciones)
     .where(eq(cotizaciones.reemplazaId, cot.id))
+  const [pedido] = await db
+    .select({ id: pedidos.id, codigo: pedidos.codigo })
+    .from(pedidos)
+    .where(eq(pedidos.cotizacionId, cot.id))
   const config = await leerConfiguracion()
   const lineasOut: LineaCotizacion[] = lineas.map((l) => ({
     productoId: l.productoId,
@@ -164,6 +169,7 @@ async function detalle(cot: FilaCot, u: UsuarioSesion): Promise<CotizacionDetall
     imagenes,
     resumen: ocultar ? { ...resumen, ganancia: 0 } : resumen,
     reemplazadaPor: siguiente?.id ?? null,
+    pedido: pedido ?? null,
   }
 }
 

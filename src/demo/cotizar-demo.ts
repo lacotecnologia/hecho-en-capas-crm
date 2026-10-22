@@ -24,7 +24,7 @@ import { skuDe } from '@shared/taller'
 import { ApiError } from '@/lib/api'
 import { portadaDe, type TallerDemo } from './taller-demo'
 
-type CotizacionDemo = {
+export type CotizacionDemo = {
   id: number
   anio: number
   numero: number
@@ -98,7 +98,10 @@ export function atenderCotizar(
   u: Persona,
   ruta: string,
   metodo: string,
-  c: Record<string, unknown>
+  c: Record<string, unknown>,
+  pedidoDe: (
+    cotizacionId: number
+  ) => { id: number; codigo: string } | null = () => null
 ): unknown {
   const esAdmin = u.roles.includes('admin')
   const vende = esAdmin || u.roles.includes('comercial')
@@ -222,6 +225,7 @@ export function atenderCotizar(
       resumen: ocultar ? { ...resumen, ganancia: 0 } : resumen,
       reemplazadaPor:
         d.cotizaciones.find((x) => x.reemplazaId === cot.id)?.id ?? null,
+      pedido: pedidoDe(cot.id),
     }
   }
 

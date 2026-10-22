@@ -10,6 +10,7 @@ import {
   Users,
   Wallet,
   FileText,
+  Layers,
 } from 'lucide-react'
 
 export type ItemMenu = {
@@ -52,13 +53,20 @@ export const MENU: GrupoMenu[] = [
         url: '/pedidos',
         icono: ClipboardList,
         descripcion: 'Mira en qué va cada pedido',
-        roles: ['admin', 'comercial', 'fabricacion'],
+        roles: ['admin', 'comercial', 'fabricacion', 'entregas'],
+      },
+      {
+        titulo: 'Cola de impresión',
+        url: '/cola',
+        icono: Layers,
+        descripcion: 'Qué se está imprimiendo y qué sigue',
+        roles: ['admin', 'fabricacion', 'comercial'],
       },
       {
         titulo: 'Taller',
         url: '/taller',
         icono: Printer,
-        descripcion: 'Productos, precios de fábrica y cola de impresión',
+        descripcion: 'Productos, impresoras, bobinas y precios de fábrica',
         roles: ['admin', 'fabricacion'],
       },
       {

@@ -21,6 +21,12 @@ import {
   cotizarInicial,
   type CotizarDemo,
 } from './cotizar-demo'
+import {
+  atenderPedidos,
+  pedidoDeCotizacion,
+  pedidosInicial,
+  type PedidosDemo,
+} from './pedidos-demo'
 import { atenderTaller, tallerInicial, type TallerDemo } from './taller-demo'
 
 type PersonaDemo = {
@@ -42,9 +48,10 @@ type EstadoDemo = {
   sesion: number | null
   taller: TallerDemo
   cotizar: CotizarDemo
+  pedidos: PedidosDemo
 }
 
-const CLAVE = 'hec-demo-v3'
+const CLAVE = 'hec-demo-v4'
 const MAX_INTENTOS = 5
 const MINUTOS_BLOQUEO = 15
 
@@ -82,49 +89,84 @@ function inicial(): EstadoDemo {
     sesion: null,
     taller: tallerInicial(valoresPorDefecto()),
     cotizar: cotizarInicial(),
+    pedidos: pedidosInicial(),
   }
   ejemploCotizacion(estado)
   return estado
 }
 
-/** Una cotización enviada de ejemplo, para que la lista no arranque vacía. */
+/** Datos de ejemplo: una cotización enviada y un pedido imprimiéndose. */
 function ejemploCotizacion(estado: EstadoDemo) {
-  const tarjeta = estado.taller.productos.find((p) => p.id === 2)
-  if (!tarjeta || tarjeta.precioFabrica <= 0) return
-  const ana = estado.personas[1]
-  const llamar = (ruta: string, cuerpo: Record<string, unknown> = {}) =>
-    atenderCotizar(
-      estado.cotizar,
-      estado.taller,
-      estado.config,
-      new Map(estado.personas.map((p) => [p.id, p.nombre])),
-      ana,
-      ruta,
-      'POST',
-      cuerpo
-    ) as { cotizacion: { id: number } }
+  const como = (
+    usuario: number,
+    ruta: string,
+    cuerpo: Record<string, unknown> = {},
+    metodo = 'POST'
+  ) => {
+    estado.sesion = usuario
+    try {
+      return atender(estado, ruta, metodo, cuerpo) as {
+        cotizacion: { id: number }
+        pedido: { id: number }
+        orden: { id: number }
+      }
+    } finally {
+      estado.sesion = null
+    }
+  }
+  const precio = (id: number) => {
+    const p = estado.taller.productos.find((x) => x.id === id)
+    return p
+      ? precioMaximoComercial(p.precioFabrica, estado.config.tope_comercial)
+      : 0
+  }
   try {
-    const { cotizacion } = llamar('/cotizaciones', {
+    // 1) Cotización enviada, esperando respuesta
+    const { cotizacion } = como(2, '/cotizaciones', {
       clienteId: 1,
       modalidad: 'local',
-      lineas: [
-        {
-          productoId: 2,
-          cantidad: 50,
-          precioVenta: precioMaximoComercial(
-            tarjeta.precioFabrica,
-            estado.config.tope_comercial
-          ),
-        },
-      ],
+      lineas: [{ productoId: 2, cantidad: 50, precioVenta: precio(2) }],
       cargos: [{ concepto: 'Envío', valor: 8000 }],
-      descuento: 0,
       notas: 'Tarjetas con el logo del café en los colores de la marca.',
     })
-    llamar(`/cotizaciones/${cotizacion.id}/enviar`)
+    como(2, `/cotizaciones/${cotizacion.id}/enviar`)
+    // 2) Pedido aprobado y en la impresora
+    const { cliente } = atenderCliente(estado)
+    const otra = como(2, '/cotizaciones', {
+      clienteId: cliente,
+      modalidad: 'nacional',
+      lineas: [{ productoId: 1, cantidad: 24, precioVenta: precio(1) }],
+      cargos: [{ concepto: 'Envío', valor: 15000 }],
+      notas: 'Llaveros para el evento de aniversario.',
+    }).cotizacion
+    como(2, `/cotizaciones/${otra.id}/enviar`)
+    como(2, `/cotizaciones/${otra.id}/aprobar`)
+    const { pedido } = como(2, '/pedidos', { cotizacionId: otra.id })
+    const cola = como(3, '/cola', {}, 'GET') as unknown as {
+      ordenes: { id: number; pedido: { id: number } | null }[]
+    }
+    const orden = cola.ordenes.find((o) => o.pedido?.id === pedido.id)
+    if (orden)
+      como(3, `/cola/${orden.id}/empezar`, { impresoraId: 1, bobinaId: 1 })
+    // 3) Algo para stock esperando turno
+    como(3, '/cola/stock', { productoId: 2, cantidad: 12 })
   } catch {
-    // Si los datos de ejemplo cambian, la demo arranca sin cotización.
+    // Si los datos de ejemplo cambian, la demo arranca con menos ejemplos.
   }
+}
+
+function atenderCliente(estado: EstadoDemo) {
+  const id = Math.max(0, ...estado.cotizar.clientes.map((c) => c.id)) + 1
+  estado.cotizar.clientes.push({
+    id,
+    nombre: 'Gimnasio Fuerza Viva',
+    whatsapp: '315 444 9087',
+    email: '',
+    ciudad: 'Manizales',
+    direccion: 'Cl. 65 # 23-10',
+    documento: '',
+  })
+  return { cliente: id }
 }
 
 let memoria: EstadoDemo | null = null
@@ -430,6 +472,26 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
       estado.taller,
       estado.config,
       new Map(estado.personas.map((p) => [p.id, p.nombre])),
+      persona,
+      ruta,
+      metodo,
+      c,
+      (id) => pedidoDeCotizacion(estado.pedidos, id)
+    )
+    if (respuesta !== undefined) return respuesta
+  }
+
+  // ---- Pedidos y cola de impresión ----
+  if (ruta.startsWith('/pedidos') || ruta.startsWith('/cola')) {
+    const persona = yo(estado)
+    const respuesta = atenderPedidos(
+      {
+        d: estado.pedidos,
+        cot: estado.cotizar,
+        taller: estado.taller,
+        config: estado.config,
+        nombres: new Map(estado.personas.map((p) => [p.id, p.nombre])),
+      },
       persona,
       ruta,
       metodo,

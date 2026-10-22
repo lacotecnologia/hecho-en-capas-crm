@@ -29,6 +29,13 @@
       "when": 1792628898971,
       "tag": "0003_clientes_cotizaciones",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792680166321,
+      "tag": "0004_pedidos_y_cola",
+      "breakpoints": true
     }
   ]
 }
