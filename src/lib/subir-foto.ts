@@ -1,5 +1,9 @@
 import { ApiError } from '@/lib/api'
-import { comoDataUrl, reducirImagen } from '@/features/taller/subir-archivo'
+import {
+  comoDataUrl,
+  falloDeSubida,
+  reducirImagen,
+} from '@/features/taller/subir-archivo'
 
 const ES_PRUEBA = import.meta.env.VITE_DEMO === '1'
 
@@ -38,9 +42,7 @@ export async function subirFoto(
     const texto = error instanceof Error ? error.message : ''
     throw new ApiError(
       400,
-      texto.includes('almacenamiento')
-        ? texto
-        : 'No se pudo subir la foto. Revisa el internet e intenta de nuevo.'
+      texto.includes('almacenamiento') ? texto : falloDeSubida('la foto')
     )
   }
 }

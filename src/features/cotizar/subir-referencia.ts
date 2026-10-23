@@ -1,5 +1,10 @@
 import { ApiError } from '@/lib/api'
-import { comoDataUrl, reducirImagen } from '@/features/taller/subir-archivo'
+import {
+  comoDataUrl,
+  falloDeSubida,
+  nombreSeguro,
+  reducirImagen,
+} from '@/features/taller/subir-archivo'
 import { agregarImagen } from './api'
 
 const ES_PRUEBA = import.meta.env.VITE_DEMO === '1'
@@ -12,7 +17,8 @@ export async function subirReferencia(cotizacionId: number, archivo: File) {
       `"${archivo.name}" no es una imagen. Sube JPG, PNG o WebP.`
     )
   }
-  const nombre = `${archivo.name.replace(/\.[^.]+$/, '')}.webp`
+  const base = archivo.name.normalize('NFC').replace(/\.[^.]+$/, '')
+  const nombre = `${base}.webp`
   if (ES_PRUEBA) {
     const url = await comoDataUrl(await reducirImagen(archivo, 700, 0.75))
     return agregarImagen(cotizacionId, { url, nombre })
@@ -21,7 +27,7 @@ export async function subirReferencia(cotizacionId: number, archivo: File) {
   const { uploadPresigned } = await import('@vercel/blob/client')
   try {
     const r = await uploadPresigned(
-      `cotizaciones/${cotizacionId}/${nombre}`,
+      `cotizaciones/${cotizacionId}/${nombreSeguro(base)}.webp`,
       contenido,
       {
         access: 'public',
@@ -38,7 +44,7 @@ export async function subirReferencia(cotizacionId: number, archivo: File) {
         ? texto
         : texto.includes('client token')
           ? `No se pudo subir "${archivo.name}": el almacenamiento de archivos no respondió. Si sigue pasando, avísale al administrador.`
-          : `No se pudo subir "${archivo.name}". Revisa el internet e intenta de nuevo.`
+          : falloDeSubida(`"${archivo.name}"`)
     )
   }
 }
