@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import {
   estadoPago,
@@ -39,7 +39,7 @@ rutasCobros.get('/', async (c) => {
     .innerJoin(clientes, eq(clientes.id, pedidos.clienteId))
     .innerJoin(usuarios, eq(usuarios.id, pedidos.comercialId))
     .leftJoin(entregas, eq(entregas.pedidoId, pedidos.id))
-    .where(soloMios ? eq(pedidos.comercialId, u.id) : undefined)
+    .where(and(isNull(pedidos.borradoEn), soloMios ? eq(pedidos.comercialId, u.id) : undefined))
 
   const fila = (f: (typeof filas)[number]): PedidoPorCobrar => {
     const cancelado = f.p.estado === 'cancelado'
@@ -83,7 +83,13 @@ rutasCobros.get('/', async (c) => {
     .innerJoin(pedidos, eq(pedidos.id, pagos.pedidoId))
     .innerJoin(clientes, eq(clientes.id, pedidos.clienteId))
     .leftJoin(usuarios, eq(usuarios.id, pagos.usuarioId))
-    .where(and(gte(pagos.creadoEn, hace60), soloMios ? eq(pedidos.comercialId, u.id) : undefined))
+    .where(
+      and(
+        gte(pagos.creadoEn, hace60),
+        isNull(pedidos.borradoEn),
+        soloMios ? eq(pedidos.comercialId, u.id) : undefined
+      )
+    )
     .orderBy(desc(pagos.id))
     .limit(200)
   const suma = (desde: Date) =>

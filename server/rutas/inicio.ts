@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, lte, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { type Pendiente } from '../../shared/inicio.js'
 import { getDb } from '../db/index.js'
@@ -40,7 +40,14 @@ rutasInicio.get('/', async (c) => {
     const [porVencer] = await db
       .select({ n: contar })
       .from(cotizaciones)
-      .where(and(eq(cotizaciones.estado, 'enviada'), lte(cotizaciones.venceEn, en2Dias), cotMias))
+      .where(
+        and(
+          eq(cotizaciones.estado, 'enviada'),
+          lte(cotizaciones.venceEn, en2Dias),
+          isNull(cotizaciones.borradoEn),
+          cotMias
+        )
+      )
     agregar(porVencer.n, ['cotización vence en los próximos 2 días: llama al cliente', 'cotizaciones vencen en los próximos 2 días: llama al cliente'], '/cotizar', 'urgente')
     const [aprobadas] = await db
       .select({ n: contar })
@@ -48,6 +55,7 @@ rutasInicio.get('/', async (c) => {
       .where(
         and(
           eq(cotizaciones.estado, 'aprobada'),
+          isNull(cotizaciones.borradoEn),
           sql`not exists (select 1 from pedidos p where p.cotizacion_id = ${cotizaciones.id})`,
           cotMias
         )
@@ -71,7 +79,10 @@ rutasInicio.get('/', async (c) => {
     agregar(deben.n, ['pedido entregado aún debe plata', 'pedidos entregados aún deben plata'], '/cobros')
   }
   if (taller) {
-    const [solicitudes] = await db.select({ n: contar }).from(productos).where(eq(productos.estado, 'solicitud'))
+    const [solicitudes] = await db
+      .select({ n: contar })
+      .from(productos)
+      .where(and(eq(productos.estado, 'solicitud'), isNull(productos.borradoEn)))
     agregar(solicitudes.n, ['personalizado pedido por un comercial espera diseño y precio', 'personalizados pedidos por los comerciales esperan diseño y precio'], '/taller')
     const [tarde] = await db
       .select({ n: contar })

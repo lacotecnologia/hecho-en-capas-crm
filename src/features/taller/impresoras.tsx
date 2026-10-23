@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { BotonBorrar } from '@/components/boton-borrar'
 import { Campo, CampoNumero } from '@/components/campo'
 import { consultaConfiguracion } from '@/features/configuracion/api'
 import { consultaImpresoras, guardarImpresora } from './api'
@@ -273,6 +274,15 @@ function FormImpresora({
         <p className='text-sm font-medium text-destructive'>{error.mensaje}</p>
       )}
       <DialogFooter>
+        {impresora && (
+          <BotonBorrar
+            tipo='impresora'
+            id={impresora.id}
+            nombre={impresora.nombre}
+            onBorrado={onCerrar}
+            className='text-destructive hover:text-destructive sm:me-auto'
+          />
+        )}
         <Button type='button' variant='outline' onClick={onCerrar}>
           Cancelar
         </Button>

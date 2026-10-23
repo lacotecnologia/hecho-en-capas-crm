@@ -50,6 +50,15 @@ const creadoEn = () =>
 const actualizadoEn = () =>
   timestamp('actualizado_en', { withTimezone: true }).notNull().defaultNow()
 
+/**
+ * Borrado lógico (solo el administrador): la fila se esconde de las listas
+ * pero se conserva, y se puede recuperar desde la Papelera.
+ */
+const borrado = () => ({
+  borradoEn: timestamp('borrado_en', { withTimezone: true }),
+  borradoPor: integer('borrado_por').references(() => usuarios.id),
+})
+
 /** Impresoras del taller. El costo por hora sale de su precio y su consumo. */
 export const impresoras = pgTable('impresoras', {
   id: serial('id').primaryKey(),
@@ -63,6 +72,7 @@ export const impresoras = pgTable('impresoras', {
   activa: boolean('activa').notNull().default(true),
   creadoEn: creadoEn(),
   actualizadoEn: actualizadoEn(),
+    ...borrado(),
 })
 
 /** Bobinas de filamento. Cada rollo con su serial, como en Bambu Studio. */
@@ -78,6 +88,7 @@ export const bobinas = pgTable('bobinas', {
   activa: boolean('activa').notNull().default(true),
   creadoEn: creadoEn(),
   actualizadoEn: actualizadoEn(),
+    ...borrado(),
 })
 
 /** Catálogo: lo que se fabrica y su precio de fábrica. */
@@ -121,6 +132,7 @@ export const productos = pgTable(
     creadoPor: integer('creado_por').references(() => usuarios.id),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),
+    ...borrado(),
   },
   (t) => [index('productos_estado_idx').on(t.estado)]
 )
@@ -190,6 +202,7 @@ export const clientes = pgTable('clientes', {
   creadoPor: integer('creado_por').references(() => usuarios.id),
   creadoEn: creadoEn(),
   actualizadoEn: actualizadoEn(),
+    ...borrado(),
 })
 
 /**
@@ -230,6 +243,7 @@ export const cotizaciones = pgTable(
     reemplazaId: integer('reemplaza_id'),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),
+    ...borrado(),
   },
   (t) => [
     uniqueIndex('cotizaciones_numero_version_idx').on(t.anio, t.numero, t.version),
@@ -328,6 +342,7 @@ export const pedidos = pgTable(
     creadoPor: integer('creado_por').references(() => usuarios.id),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),
+    ...borrado(),
   },
   (t) => [
     uniqueIndex('pedidos_numero_idx').on(t.anio, t.numero),

@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, lt, ne, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { estadoPago } from '../../shared/entregas.js'
 import {
@@ -35,7 +35,7 @@ rutasReportes.get('/', async (c) => {
     .from(pedidos)
     .innerJoin(clientes, eq(clientes.id, pedidos.clienteId))
     .innerJoin(usuarios, eq(usuarios.id, pedidos.comercialId))
-    .where(and(gte(pedidos.creadoEn, desde), lt(pedidos.creadoEn, hasta), ne(pedidos.estado, 'cancelado'), mios))
+    .where(and(gte(pedidos.creadoEn, desde), lt(pedidos.creadoEn, hasta), ne(pedidos.estado, 'cancelado'), isNull(pedidos.borradoEn), mios))
 
   const [cobro] = await db
     .select({ total: sql<number>`coalesce(sum(${pagos.monto}), 0)::int` })
@@ -101,7 +101,7 @@ rutasReportes.get('/', async (c) => {
     .innerJoin(clientes, eq(clientes.id, pedidos.clienteId))
     .innerJoin(usuarios, eq(usuarios.id, pedidos.comercialId))
     .leftJoin(entregas, eq(entregas.pedidoId, pedidos.id))
-    .where(and(eq(pedidos.estado, 'entregado'), mios))
+    .where(and(eq(pedidos.estado, 'entregado'), isNull(pedidos.borradoEn), mios))
 
   const r: ReporteMes = {
     mes,

@@ -9,6 +9,7 @@ import { rutasConfiguracion } from './rutas/configuracion.js'
 import { rutasCotizaciones } from './rutas/cotizaciones.js'
 import { rutasEntregas } from './rutas/entregas.js'
 import { rutasInicio } from './rutas/inicio.js'
+import { rutasPapelera } from './rutas/papelera.js'
 import { rutasPedidos } from './rutas/pedidos.js'
 import { rutasReportes } from './rutas/reportes.js'
 import { rutasSeguimiento } from './rutas/seguimiento.js'
@@ -45,6 +46,7 @@ app.route('/cobros', rutasCobros)
 app.route('/seguimiento', rutasSeguimiento)
 app.route('/reportes', rutasReportes)
 app.route('/inicio', rutasInicio)
+app.route('/papelera', rutasPapelera)
 
 app.notFound((c) => c.json({ mensaje: 'Esta dirección no existe.' }, 404))
 

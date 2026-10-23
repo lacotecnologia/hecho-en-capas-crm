@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { type Context, Hono } from 'hono'
 import {
@@ -73,13 +73,16 @@ async function listar(ids?: number[]): Promise<OrdenCola[]> {
     .where(
       ids
         ? inArray(ordenesProduccion.id, ids)
-        : or(
+        : and(
+            // Si se borró el pedido, sus órdenes ya no se muestran
+            isNull(pedidos.borradoEn),
+            or(
             inArray(ordenesProduccion.estado, ['en_cola', 'imprimiendo', 'postproceso']),
             and(
               eq(ordenesProduccion.estado, 'listo'),
               gte(ordenesProduccion.actualizadoEn, haceUnaSemana)
             )
-          )
+          ))
     )
     // Primero lo que se le prometió antes al cliente; lo de stock al final
     .orderBy(
@@ -141,6 +144,7 @@ rutasCola.get('/', ve, async (c) => {
   const imps = await db
     .select({ id: impresoras.id, nombre: impresoras.nombre, multicolor: impresoras.multicolor, activa: impresoras.activa })
     .from(impresoras)
+    .where(isNull(impresoras.borradoEn))
     .orderBy(asc(impresoras.id))
   return c.json({ ordenes: lista, impresoras: imps })
 })
@@ -199,7 +203,10 @@ rutasCola.post('/:id/empezar', deTaller, async (c) => {
   const impresoraId = Number(cuerpo.impresoraId) || 0
   const bobinaId = Number(cuerpo.bobinaId) || null
   return mover(c, ['en_cola'], 'imprimiendo', async (tx, o) => {
-    const [imp] = await tx.select().from(impresoras).where(eq(impresoras.id, impresoraId))
+    const [imp] = await tx
+      .select()
+      .from(impresoras)
+      .where(and(eq(impresoras.id, impresoraId), isNull(impresoras.borradoEn)))
     const [prod] = await tx.select().from(productos).where(eq(productos.id, o.productoId))
     const v = validarImpresoraParaOrden(prod, imp)
     if (!v.ok) return { error: v.mensaje, campo: v.campo }
@@ -301,7 +308,10 @@ rutasCola.post('/stock', deTaller, async (c) => {
     return c.json({ mensaje: 'Escribe cuántas unidades vas a imprimir (de 1 a 1000).', campo: 'cantidad' }, 400)
   }
   const db = getDb()
-  const [p] = await db.select().from(productos).where(eq(productos.id, productoId))
+  const [p] = await db
+    .select()
+    .from(productos)
+    .where(and(eq(productos.id, productoId), isNull(productos.borradoEn)))
   if (!p) return c.json({ mensaje: 'Elige el producto.', campo: 'productoId' }, 400)
   if (p.estado !== 'activo' || p.tipo !== 'catalogo') {
     return c.json(

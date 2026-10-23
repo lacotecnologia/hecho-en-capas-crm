@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { BotonBorrar } from '@/components/boton-borrar'
 import { Campo, CampoNumero } from '@/components/campo'
 import { consultaBobinas, guardarBobina } from './api'
 import { formatoNumero, formatoPesos, precioGramo } from './formato'
@@ -286,6 +287,15 @@ function FormBobina({
         <p className='text-sm font-medium text-destructive'>{error.mensaje}</p>
       )}
       <DialogFooter>
+        {bobina && (
+          <BotonBorrar
+            tipo='bobina'
+            id={bobina.id}
+            nombre={`${bobina.material} ${bobina.color}${bobina.serial ? ` (${bobina.serial})` : ''}`}
+            onBorrado={onCerrar}
+            className='text-destructive hover:text-destructive sm:me-auto'
+          />
+        )}
         <Button type='button' variant='outline' onClick={onCerrar}>
           Cancelar
         </Button>

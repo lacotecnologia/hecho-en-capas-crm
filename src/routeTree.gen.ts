@@ -15,6 +15,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as SeguimientoCodigoRouteImport } from './routes/seguimiento/$codigo'
 import { Route as AuthenticatedReportesRouteImport } from './routes/_authenticated/reportes'
 import { Route as AuthenticatedPersonasRouteImport } from './routes/_authenticated/personas'
+import { Route as AuthenticatedPapeleraRouteImport } from './routes/_authenticated/papelera'
 import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticated/entregas'
 import { Route as AuthenticatedConfiguracionRouteImport } from './routes/_authenticated/configuracion'
 import { Route as AuthenticatedColaRouteImport } from './routes/_authenticated/cola'
@@ -59,6 +60,11 @@ const AuthenticatedReportesRoute = AuthenticatedReportesRouteImport.update({
 const AuthenticatedPersonasRoute = AuthenticatedPersonasRouteImport.update({
   id: '/personas',
   path: '/personas',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPapeleraRoute = AuthenticatedPapeleraRouteImport.update({
+  id: '/papelera',
+  path: '/papelera',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedEntregasRoute = AuthenticatedEntregasRouteImport.update({
@@ -159,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/cola': typeof AuthenticatedColaRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
   '/entregas': typeof AuthenticatedEntregasRoute
+  '/papelera': typeof AuthenticatedPapeleraRoute
   '/personas': typeof AuthenticatedPersonasRoute
   '/reportes': typeof AuthenticatedReportesRoute
   '/seguimiento/$codigo': typeof SeguimientoCodigoRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/cola': typeof AuthenticatedColaRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
   '/entregas': typeof AuthenticatedEntregasRoute
+  '/papelera': typeof AuthenticatedPapeleraRoute
   '/personas': typeof AuthenticatedPersonasRoute
   '/reportes': typeof AuthenticatedReportesRoute
   '/seguimiento/$codigo': typeof SeguimientoCodigoRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/_authenticated/cola': typeof AuthenticatedColaRoute
   '/_authenticated/configuracion': typeof AuthenticatedConfiguracionRoute
   '/_authenticated/entregas': typeof AuthenticatedEntregasRoute
+  '/_authenticated/papelera': typeof AuthenticatedPapeleraRoute
   '/_authenticated/personas': typeof AuthenticatedPersonasRoute
   '/_authenticated/reportes': typeof AuthenticatedReportesRoute
   '/seguimiento/$codigo': typeof SeguimientoCodigoRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/cola'
     | '/configuracion'
     | '/entregas'
+    | '/papelera'
     | '/personas'
     | '/reportes'
     | '/seguimiento/$codigo'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/cola'
     | '/configuracion'
     | '/entregas'
+    | '/papelera'
     | '/personas'
     | '/reportes'
     | '/seguimiento/$codigo'
@@ -278,6 +289,7 @@ export interface FileRouteTypes {
     | '/_authenticated/cola'
     | '/_authenticated/configuracion'
     | '/_authenticated/entregas'
+    | '/_authenticated/papelera'
     | '/_authenticated/personas'
     | '/_authenticated/reportes'
     | '/seguimiento/$codigo'
@@ -345,6 +357,13 @@ declare module '@tanstack/react-router' {
       path: '/personas'
       fullPath: '/personas'
       preLoaderRoute: typeof AuthenticatedPersonasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/papelera': {
+      id: '/_authenticated/papelera'
+      path: '/papelera'
+      fullPath: '/papelera'
+      preLoaderRoute: typeof AuthenticatedPapeleraRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/entregas': {
@@ -467,6 +486,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedColaRoute: typeof AuthenticatedColaRoute
   AuthenticatedConfiguracionRoute: typeof AuthenticatedConfiguracionRoute
   AuthenticatedEntregasRoute: typeof AuthenticatedEntregasRoute
+  AuthenticatedPapeleraRoute: typeof AuthenticatedPapeleraRoute
   AuthenticatedPersonasRoute: typeof AuthenticatedPersonasRoute
   AuthenticatedReportesRoute: typeof AuthenticatedReportesRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -483,6 +503,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedColaRoute: AuthenticatedColaRoute,
   AuthenticatedConfiguracionRoute: AuthenticatedConfiguracionRoute,
   AuthenticatedEntregasRoute: AuthenticatedEntregasRoute,
+  AuthenticatedPapeleraRoute: AuthenticatedPapeleraRoute,
   AuthenticatedPersonasRoute: AuthenticatedPersonasRoute,
   AuthenticatedReportesRoute: AuthenticatedReportesRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,

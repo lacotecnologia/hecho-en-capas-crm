@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, max, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { sumarDiasHabiles } from '../../shared/cotizacion.js'
 import { estadoPago, validarReembolso } from '../../shared/entregas.js'
@@ -78,7 +78,10 @@ function puedeCobrar(u: UsuarioSesion, p: { comercialId: number }) {
 }
 
 async function cargar(id: number, u: UsuarioSesion) {
-  const [p] = await getDb().select().from(pedidos).where(eq(pedidos.id, id))
+  const [p] = await getDb()
+    .select()
+    .from(pedidos)
+    .where(and(eq(pedidos.id, id), isNull(pedidos.borradoEn)))
   if (!p || !puedeVer(u, p)) return null
   return p
 }
@@ -249,6 +252,7 @@ rutasPedidos.get('/', ve, async (c) => {
     .from(pedidos)
     .innerJoin(clientes, eq(clientes.id, pedidos.clienteId))
     .innerJoin(usuarios, eq(usuarios.id, pedidos.comercialId))
+    .where(isNull(pedidos.borradoEn))
     .orderBy(desc(pedidos.actualizadoEn))
     .limit(300)
   const lista: PedidoResumen[] = filas
@@ -283,17 +287,28 @@ rutasPedidos.post('/', vende, async (c) => {
   const cuerpo = await c.req.json().catch(() => ({}))
   const cotizacionId = Number(cuerpo.cotizacionId) || 0
   const db = getDb()
-  const [cot] = await db.select().from(cotizaciones).where(eq(cotizaciones.id, cotizacionId))
+  const [cot] = await db
+    .select()
+    .from(cotizaciones)
+    .where(and(eq(cotizaciones.id, cotizacionId), isNull(cotizaciones.borradoEn)))
   if (!cot) return c.json({ mensaje: 'No encontramos esa cotización.' }, 404)
   if (!esAdmin(u) && cot.comercialId !== u.id) {
     return c.json({ mensaje: 'Esta cotización es de otro comercial.' }, 403)
   }
   const [ya] = await db
-    .select({ id: pedidos.id, codigo: pedidos.codigo })
+    .select({ id: pedidos.id, codigo: pedidos.codigo, borradoEn: pedidos.borradoEn })
     .from(pedidos)
     .where(eq(pedidos.cotizacionId, cot.id))
   if (ya) {
-    return c.json({ mensaje: `Esta cotización ya es el pedido ${ya.codigo}.`, pedidoId: ya.id }, 409)
+    return c.json(
+      {
+        mensaje: ya.borradoEn
+          ? `Esta cotización ya fue el pedido ${ya.codigo}, que está en la Papelera. El administrador lo puede recuperar desde ahí.`
+          : `Esta cotización ya es el pedido ${ya.codigo}.`,
+        pedidoId: ya.borradoEn ? undefined : ya.id,
+      },
+      409
+    )
   }
   if (cot.estado !== 'aprobada') {
     return c.json(

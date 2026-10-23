@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { BotonBorrar } from '@/components/boton-borrar'
 import { Campo } from '@/components/campo'
 import { consultaClientes, crearCliente } from './api'
 
@@ -64,14 +65,24 @@ export function SelectorCliente({
           </p>
         </div>
         {!soloLectura && (
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            onClick={() => onElegir(null)}
-          >
-            <X /> Cambiar cliente
-          </Button>
+          <div className='flex flex-wrap gap-1'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={() => onElegir(null)}
+            >
+              <X /> Cambiar cliente
+            </Button>
+            <BotonBorrar
+              tipo='cliente'
+              id={cliente.id}
+              nombre={cliente.nombre}
+              variante='ghost'
+              className='h-8 text-destructive hover:text-destructive'
+              onBorrado={() => onElegir(null)}
+            />
+          </div>
         )}
       </div>
     )

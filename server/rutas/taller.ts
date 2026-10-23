@@ -1,5 +1,5 @@
 import { del } from '@vercel/blob'
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { calcularCosto } from '../../shared/costos.js'
 import {
@@ -50,6 +50,7 @@ rutasTaller.get('/impresoras', deTaller, async (c) => {
   const lista = await getDb()
     .select()
     .from(impresoras)
+    .where(isNull(impresoras.borradoEn))
     .orderBy(desc(impresoras.activa), asc(impresoras.id))
   return c.json({ impresoras: lista })
 })
@@ -79,6 +80,7 @@ rutasTaller.get('/bobinas', deTaller, async (c) => {
   const lista = await getDb()
     .select()
     .from(bobinas)
+    .where(isNull(bobinas.borradoEn))
     .orderBy(desc(bobinas.activa), asc(bobinas.material), asc(bobinas.color))
   return c.json({ bobinas: lista })
 })
@@ -173,7 +175,10 @@ function costos(p: FilaProducto): ProductoCosto {
 
 async function detalle(id: number, verCostos: boolean) {
   const db = getDb()
-  const [p] = await db.select().from(productos).where(eq(productos.id, id))
+  const [p] = await db
+    .select()
+    .from(productos)
+    .where(and(eq(productos.id, id), isNull(productos.borradoEn)))
   if (!p) return null
   const archivos = await db
     .select()
@@ -238,7 +243,7 @@ async function prepararProducto(cuerpo: Record<string, unknown>) {
     const existen = await db
       .select({ id: bobinas.id })
       .from(bobinas)
-      .where(inArray(bobinas.id, e.colores))
+      .where(and(inArray(bobinas.id, e.colores), isNull(bobinas.borradoEn)))
     if (existen.length !== e.colores.length) {
       return {
         ok: false as const,
@@ -273,6 +278,7 @@ rutasTaller.get('/productos', veCatalogo, async (c) => {
   const lista = await getDb()
     .select()
     .from(productos)
+    .where(isNull(productos.borradoEn))
     .orderBy(desc(productos.actualizadoEn))
   const fotos = await portadas(lista.map((p) => p.id))
   const colores = await coloresDe(
@@ -325,7 +331,7 @@ rutasTaller.patch('/productos/:id', deTaller, async (c) => {
     const [antes] = await tx
       .select()
       .from(productos)
-      .where(eq(productos.id, id))
+      .where(and(eq(productos.id, id), isNull(productos.borradoEn)))
       .for('update')
     if (!antes) return { error: NO_EXISTE_PRODUCTO, status: 404 as const }
     const previos = (await coloresDe(tx, [id])).get(id) ?? []
@@ -378,7 +384,7 @@ rutasTaller.post('/productos/:id/stock', deTaller, async (c) => {
     const [p] = await tx
       .select({ stock: productos.stock, escogeColor: productos.escogeColor })
       .from(productos)
-      .where(eq(productos.id, id))
+      .where(and(eq(productos.id, id), isNull(productos.borradoEn)))
     if (!p) return { error: NO_EXISTE_PRODUCTO, status: 404 as const }
     const colores = (await coloresDe(tx, [id])).get(id) ?? []
     const v = validarAjusteStock({ ...p, colores }, cuerpo)
@@ -418,7 +424,10 @@ rutasTaller.post('/productos/:id/archivos', deTaller, async (c) => {
     return c.json({ mensaje: 'El archivo no se subió bien. Intenta de nuevo.' }, 400)
   }
   const db = getDb()
-  const [p] = await db.select({ id: productos.id }).from(productos).where(eq(productos.id, id))
+  const [p] = await db
+    .select({ id: productos.id })
+    .from(productos)
+    .where(and(eq(productos.id, id), isNull(productos.borradoEn)))
   if (!p) return c.json({ mensaje: NO_EXISTE_PRODUCTO }, 404)
 
   let esPortada = false

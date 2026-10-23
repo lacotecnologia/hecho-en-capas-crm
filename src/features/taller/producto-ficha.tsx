@@ -61,6 +61,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { BotonBorrar } from '@/components/boton-borrar'
 import { Campo, CampoNumero } from '@/components/campo'
 import { BotonesColor, EtiquetaColor } from '@/components/color'
 import { Pagina } from '@/components/layout/pagina'
@@ -326,7 +327,19 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
           ? `${producto.sku} · ${ESTADOS_INFO[producto.estado].explicacion}`
           : 'Llena lo que sepas; puedes guardarlo y completarlo después.'
       }
-      acciones={producto && <BotonStock producto={producto} />}
+      acciones={
+        producto && (
+          <div className='flex flex-wrap gap-2'>
+            <BotonStock producto={producto} />
+            <BotonBorrar
+              tipo='producto'
+              id={producto.id}
+              nombre={`${producto.sku} · ${producto.nombre}`}
+              onBorrado={() => navigate({ to: '/taller' })}
+            />
+          </div>
+        )
+      }
     >
       <VolverAlTaller />
       <form
@@ -1071,7 +1084,9 @@ function TarjetaColores({
             className='mt-0.5'
           />
           <span className='grid gap-0.5'>
-            <span className='font-medium'>El cliente puede escoger el color</span>
+            <span className='font-medium'>
+              El cliente puede escoger el color
+            </span>
             <span className='text-sm text-muted-foreground'>
               {escogeColor
                 ? 'Marca solo los colores que se venden en este modelo.'
@@ -1102,7 +1117,8 @@ function TarjetaColores({
               <p className='text-sm font-medium text-destructive'>{error}</p>
             ) : (
               <p className='text-sm text-muted-foreground'>
-                Mínimo 2. Las demás bobinas del taller no le aparecen al comercial.
+                Mínimo 2. Las demás bobinas del taller no le aparecen al
+                comercial.
               </p>
             )}
             {sinColor > 0 && nombreDestino && (
@@ -1164,8 +1180,7 @@ function BotonStock({ producto }: { producto: ProductoDetalle }) {
           <DialogHeader>
             <DialogTitle>Ajustar stock</DialogTitle>
             <DialogDescription>
-              Hoy hay {producto.stock} unidades de {producto.nombre} ya
-              impresas
+              Hoy hay {producto.stock} unidades de {producto.nombre} ya impresas
               {conColor && producto.colores.length > 0
                 ? `: ${producto.colores
                     .map((c) => `${c.stock} ${c.color.toLowerCase()}`)

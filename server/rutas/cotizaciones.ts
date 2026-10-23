@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lt, max, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, lt, max, sql } from 'drizzle-orm'
 import { type Context, Hono } from 'hono'
 import {
   type Cargo,
@@ -67,7 +67,10 @@ type FilaCot = typeof cotizaciones.$inferSelect
 
 /** Trae la cotización y comprueba que esta persona la pueda ver o cambiar. */
 async function cargar(id: number, u: UsuarioSesion, paraCambiar: boolean) {
-  const [cot] = await getDb().select().from(cotizaciones).where(eq(cotizaciones.id, id))
+  const [cot] = await getDb()
+    .select()
+    .from(cotizaciones)
+    .where(and(eq(cotizaciones.id, id), isNull(cotizaciones.borradoEn)))
   if (!cot) return { error: NO_EXISTE, status: 404 as const }
   const propia = cot.comercialId === u.id
   const soloLee = !esAdmin(u) && !propia
@@ -111,7 +114,7 @@ async function detalle(cot: FilaCot, u: UsuarioSesion): Promise<CotizacionDetall
   const [pedido] = await db
     .select({ id: pedidos.id, codigo: pedidos.codigo })
     .from(pedidos)
-    .where(eq(pedidos.cotizacionId, cot.id))
+    .where(and(eq(pedidos.cotizacionId, cot.id), isNull(pedidos.borradoEn)))
   const config = await leerConfiguracion()
   const lineasOut: LineaCotizacion[] = lineas.map((l) => ({
     productoId: l.productoId,
@@ -187,7 +190,10 @@ async function armar(entrada: CotizacionEntrada) {
   const config = await leerConfiguracion()
   const ids = [...new Set(entrada.lineas.map((l) => l.productoId))]
   const prods = ids.length
-    ? await db.select().from(productos).where(inArray(productos.id, ids))
+    ? await db
+        .select()
+        .from(productos)
+        .where(and(inArray(productos.id, ids), isNull(productos.borradoEn)))
     : []
   const mapa = new Map(prods.map((p) => [p.id, p]))
   const v = validarPreciosCotizacion(entrada.lineas, mapa, entrada.descuento, config.tope_comercial)
@@ -295,7 +301,12 @@ rutasCotizaciones.get('/', ve, async (c) => {
     .from(cotizaciones)
     .leftJoin(clientes, eq(clientes.id, cotizaciones.clienteId))
     .innerJoin(usuarios, eq(usuarios.id, cotizaciones.comercialId))
-    .where(soloMias ? eq(cotizaciones.comercialId, u.id) : undefined)
+    .where(
+      and(
+        isNull(cotizaciones.borradoEn),
+        soloMias ? eq(cotizaciones.comercialId, u.id) : undefined
+      )
+    )
     .orderBy(desc(cotizaciones.actualizadoEn))
     .limit(300)
   const lista: CotizacionResumen[] = filas.map(({ cot, clienteNombre, comercialNombre, lineas }) => ({
@@ -404,7 +415,11 @@ rutasCotizaciones.delete('/:id', vende, async (c) => {
         .where(and(eq(cotizaciones.id, r.cot.reemplazaId), eq(cotizaciones.estado, 'reemplazada')))
       await marcarVencidas()
     }
-    await tx.delete(cotizaciones).where(eq(cotizaciones.id, r.cot.id))
+    // Tampoco se pierde: queda en la Papelera del administrador
+    await tx
+      .update(cotizaciones)
+      .set({ borradoEn: new Date(), borradoPor: c.get('usuario').id })
+      .where(eq(cotizaciones.id, r.cot.id))
   })
   return c.json({ ok: true })
 })

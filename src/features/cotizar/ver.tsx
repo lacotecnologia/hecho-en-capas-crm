@@ -19,7 +19,6 @@ import { toast } from 'sonner'
 import { mensajeDeError } from '@/lib/api'
 import { tieneRol, useSesion } from '@/lib/sesion'
 import { Button } from '@/components/ui/button'
-import { EtiquetaColor } from '@/components/color'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
@@ -31,7 +30,9 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { BotonBorrar } from '@/components/boton-borrar'
 import { Campo } from '@/components/campo'
+import { EtiquetaColor } from '@/components/color'
 import { Pagina } from '@/components/layout/pagina'
 import { ConvertirEnPedido } from '@/features/pedidos/convertir'
 import { formatoPesos } from '@/features/taller/formato'
@@ -150,7 +151,19 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
     <Pagina
       titulo={`Cotización ${c.codigo}`}
       descripcion={`Para ${c.cliente?.nombre ?? 'sin cliente'} · hecha por ${c.comercial.nombre}`}
-      acciones={<EstadoCotizacionBadge estado={c.estado} />}
+      acciones={
+        <div className='flex flex-wrap items-center gap-2'>
+          <EstadoCotizacionBadge estado={c.estado} />
+          {!c.pedido && (
+            <BotonBorrar
+              tipo='cotizacion'
+              id={c.id}
+              nombre={c.codigo}
+              onBorrado={() => navigate({ to: '/cotizar' })}
+            />
+          )}
+        </div>
+      }
     >
       <Volver />
       <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start'>
@@ -198,7 +211,10 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
             </CardHeader>
             <CardContent className='grid gap-3'>
               {c.lineas.map((l) => (
-                <div key={`${l.productoId}-${l.bobinaId ?? 0}`} className='flex items-center gap-3'>
+                <div
+                  key={`${l.productoId}-${l.bobinaId ?? 0}`}
+                  className='flex items-center gap-3'
+                >
                   <div className='size-14 shrink-0 overflow-hidden rounded-lg bg-muted'>
                     {l.imagen ? (
                       <img

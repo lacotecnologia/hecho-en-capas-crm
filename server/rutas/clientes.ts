@@ -1,4 +1,4 @@
-import { asc, eq, ilike, or } from 'drizzle-orm'
+import { and, asc, eq, ilike, isNull, or } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { validarCliente } from '../../shared/cotizacion.js'
 import { getDb } from '../db/index.js'
@@ -32,7 +32,7 @@ rutasClientes.get('/', async (c) => {
   const lista = await db
     .select(columnas)
     .from(clientes)
-    .where(filtro)
+    .where(and(isNull(clientes.borradoEn), filtro))
     .orderBy(asc(clientes.nombre))
     .limit(50)
   return c.json({ clientes: lista })

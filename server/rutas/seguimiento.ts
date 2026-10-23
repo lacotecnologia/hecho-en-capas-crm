@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { type EstadoEntrega } from '../../shared/entregas.js'
 import { anticipoPendiente, type EstadoOrden, type EstadoPedido } from '../../shared/pedidos.js'
@@ -47,7 +47,10 @@ rutasSeguimiento.get('/:codigo', async (c) => {
   const codigo = normalizarCodigo(c.req.param('codigo'))
   if (!codigo) return c.json({ mensaje: NO_EXISTE }, 404)
   const db = getDb()
-  const [p] = await db.select().from(pedidos).where(eq(pedidos.seguimiento, codigo))
+  const [p] = await db
+    .select()
+    .from(pedidos)
+    .where(and(eq(pedidos.seguimiento, codigo), isNull(pedidos.borradoEn)))
   if (!p) return c.json({ mensaje: NO_EXISTE }, 404)
 
   const [cliente] = await db.select({ nombre: clientes.nombre }).from(clientes).where(eq(clientes.id, p.clienteId))

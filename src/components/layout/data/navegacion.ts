@@ -12,6 +12,7 @@ import {
   FileText,
   Layers,
   BarChart3,
+  Trash2,
 } from 'lucide-react'
 
 export type ItemMenu = {
@@ -21,6 +22,8 @@ export type ItemMenu = {
   /** Frase corta que explica para qué sirve (se usa en Inicio y en el buscador). */
   descripcion: string
   roles: readonly Rol[]
+  /** No aparece en la versión de prueba. */
+  ocultarEnPrueba?: boolean
 }
 
 export type GrupoMenu = { titulo: string; items: ItemMenu[] }
@@ -117,6 +120,14 @@ export const MENU: GrupoMenu[] = [
         descripcion: 'Tarifas, márgenes, anticipo y tiempos',
         roles: ['admin'],
       },
+      {
+        titulo: 'Papelera',
+        url: '/papelera',
+        icono: Trash2,
+        descripcion: 'Lo que se borró: recupéralo con un clic',
+        roles: ['admin'],
+        ocultarEnPrueba: true,
+      },
     ],
   },
 ]
@@ -127,6 +138,8 @@ export function menuPara(roles: readonly Rol[]): GrupoMenu[] {
     ...grupo,
     items: grupo.items.filter((item) => {
       if (!item.roles.some((r) => roles.includes(r)) || vistas.has(item.url))
+        return false
+      if (item.ocultarEnPrueba && import.meta.env.VITE_DEMO === '1')
         return false
       vistas.add(item.url)
       return true

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { MODALIDADES_INFO } from '@shared/cotizacion'
 import {
   anticipoPendiente,
@@ -34,7 +34,6 @@ import { tieneRol, useSesion } from '@/lib/sesion'
 import { subirFoto } from '@/lib/subir-foto'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { EtiquetaColor } from '@/components/color'
 import {
   Card,
   CardContent,
@@ -55,7 +54,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { BotonBorrar } from '@/components/boton-borrar'
 import { Campo, CampoNumero } from '@/components/campo'
+import { EtiquetaColor } from '@/components/color'
 import { Pagina } from '@/components/layout/pagina'
 import { formatoFecha, formatoFechaLarga } from '@/features/cotizar/estado'
 import {
@@ -135,6 +136,7 @@ function Ficha({ p }: { p: PedidoDetalle }) {
     onError: (e) => toast.error(mensajeDeError(e)),
   })
 
+  const navigate = useNavigate()
   const falta = p.total - p.pagado
   const anticipoFalta = anticipoPendiente(p)
   const compromiso = [
@@ -152,7 +154,19 @@ function Ficha({ p }: { p: PedidoDetalle }) {
     <Pagina
       titulo={`Pedido ${p.codigo}`}
       descripcion={`Para ${p.cliente.nombre} · de la cotización ${p.cotizacion.codigo} · ${p.comercial.nombre}`}
-      acciones={<EstadoPedidoBadge estado={p.estado} className='text-sm' />}
+      acciones={
+        <div className='flex flex-wrap items-center gap-2'>
+          <EstadoPedidoBadge estado={p.estado} className='text-sm' />
+          {p.estado === 'cancelado' && (
+            <BotonBorrar
+              tipo='pedido'
+              id={p.id}
+              nombre={p.codigo}
+              onBorrado={() => navigate({ to: '/pedidos' })}
+            />
+          )}
+        </div>
+      }
     >
       <Volver />
       <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start'>
