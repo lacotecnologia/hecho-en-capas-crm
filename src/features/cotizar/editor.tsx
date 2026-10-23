@@ -1,7 +1,11 @@
 import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { precioMaximoComercial } from '@shared/costos'
+import {
+  esPrecioRedondo,
+  precioMaximoComercial,
+  redondearPrecio,
+} from '@shared/costos'
 import {
   CARGOS_SUGERIDOS,
   type Cliente,
@@ -315,7 +319,7 @@ export function EditorCotizacion({
           <Paso
             numero={2}
             titulo='¿Qué productos lleva?'
-            descripcion={`Puedes subir el precio hasta ${tope} % sobre el de fábrica. Lo que subas es tu ganancia.`}
+            descripcion={`Puedes subir el precio hasta ${tope} % sobre el de fábrica, en valores redondos a mil. Lo que subas es tu ganancia.`}
           >
             <div className='grid gap-3'>
               {lineas.length === 0 && (
@@ -328,6 +332,10 @@ export function EditorCotizacion({
                 const precio = Number(l.precioVenta) || 0
                 const cant = Number(l.cantidad) || 0
                 const fuera = precio < l.precioFabrica || precio > maximo
+                const noRedondo =
+                  precio > 0 &&
+                  precio !== l.precioFabrica &&
+                  !esPrecioRedondo(precio)
                 const stock = enCatalogo.get(l.productoId)?.stock ?? 0
                 return (
                   <div
@@ -386,7 +394,9 @@ export function EditorCotizacion({
                             error={
                               fuera
                                 ? `Debe estar entre ${formatoPesos(l.precioFabrica)} y ${formatoPesos(maximo)}.`
-                                : undefined
+                                : noRedondo
+                                  ? `Debe ser redondo a mil: usa ${formatoPesos(Math.min(maximo, redondearPrecio(precio)))}.`
+                                  : undefined
                             }
                           />
                           <div className='flex flex-wrap gap-2'>
@@ -444,7 +454,7 @@ export function EditorCotizacion({
                 <Button
                   type='button'
                   variant='ghost'
-                  className='h-auto py-2 text-start whitespace-normal'
+                  className='h-auto max-w-full py-2 text-start whitespace-normal'
                   onClick={() => setPidiendo(true)}
                 >
                   <Sparkles /> ¿No está en el catálogo? Pedir un personalizado

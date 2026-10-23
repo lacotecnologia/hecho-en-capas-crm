@@ -5,7 +5,7 @@
  *
  * Costo = [material + energía + desgaste + mano de obra + diseño]
  *         × (1 + % falla) + empaque
- * Precio de fábrica = costo × (1 + margen), redondeado hacia arriba a la centena.
+ * Precio de fábrica = costo × (1 + margen), redondeado hacia arriba al mil.
  */
 
 export type DatosCosto = {
@@ -52,9 +52,17 @@ export type DesgloseCosto = {
 
 const n = (v: number) => (Number.isFinite(v) && v > 0 ? v : 0)
 
-/** Redondea hacia arriba a la centena: 4.031 -> 4.100. */
-export function redondearCentena(valor: number) {
-  return Math.ceil(valor / 100) * 100
+/** Todos los precios de venta quedan en múltiplos de mil. */
+export const PASO_PRECIO = 1000
+
+/** Redondea hacia arriba al mil: 12.430 -> 13.000 (13.000 se queda igual). */
+export function redondearPrecio(valor: number) {
+  return Math.ceil(Math.round(valor) / PASO_PRECIO) * PASO_PRECIO
+}
+
+/** ¿El precio está redondo al mil? */
+export function esPrecioRedondo(valor: number) {
+  return Number.isInteger(valor) && valor % PASO_PRECIO === 0
 }
 
 export function calcularCosto(d: DatosCosto): DesgloseCosto {
@@ -83,8 +91,13 @@ export function calcularCosto(d: DatosCosto): DesgloseCosto {
   const falla = subtotal * (n(d.fallaPct) / 100)
   const empaque = n(d.empaque)
   const costo = Math.round(subtotal + falla + empaque)
+  // costo × (100 + margen) es un entero exacto: así 14.000 no se vuelve 15.000
+  // por un error de decimales.
   const precioCalculado =
-    costo > 0 ? redondearCentena(costo * (1 + n(d.margenPct) / 100)) : 0
+    costo > 0
+      ? Math.ceil((costo * (100 + n(d.margenPct))) / (100 * PASO_PRECIO)) *
+        PASO_PRECIO
+      : 0
 
   return {
     material: Math.round(material),
@@ -101,9 +114,16 @@ export function calcularCosto(d: DatosCosto): DesgloseCosto {
   }
 }
 
-/** Lo máximo que el comercial puede cobrar por unidad. */
+/**
+ * Lo máximo que el comercial puede cobrar por unidad: el mil redondo más alto
+ * que no pasa el tope. Ej.: fábrica 13.000 con tope 25 % (16.250) -> 16.000.
+ */
 export function precioMaximoComercial(precioFabrica: number, topePct: number) {
-  return Math.floor(precioFabrica * (1 + topePct / 100))
+  const tope = Math.floor((precioFabrica * (100 + topePct)) / 100)
+  return Math.max(
+    precioFabrica,
+    Math.floor(tope / PASO_PRECIO) * PASO_PRECIO
+  )
 }
 
 /** Costo por hora de una impresora (desgaste + energía), para mostrarlo. */

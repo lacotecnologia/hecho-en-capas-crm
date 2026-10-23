@@ -30,8 +30,8 @@ Sistema interno (familiar) para cotizaciones, pedidos, taller, cobros y entregas
 ## Reglas de negocio ya decididas
 
 - Sin IVA. Anticipo 50 % solo en personalizados. Cotización vence a los 10 días.
-- Precio de fábrica = costo × (1 + margen elegido 40 % o 50 %), redondeado hacia arriba a la centena; el taller puede subirlo a mano (se guarda el calculado y el ajuste).
-- El comercial puede subir hasta 25 % sobre el precio de fábrica; esa diferencia es su ganancia. Nunca por debajo del precio de fábrica.
+- Precio de fábrica = costo × (1 + margen elegido 40 % o 50 %), redondeado hacia arriba al mil; el taller puede subirlo a mano, también en miles (se guarda el calculado y el ajuste).
+- El comercial puede subir hasta 25 % sobre el precio de fábrica, en valores redondos a mil (el máximo es el mil más alto que no pasa el 25 %); esa diferencia es su ganancia. Nunca por debajo del precio de fábrica.
 - Impresoras: Bambu Lab A1 con AMS lite (multicolor, 3.200.000 COP) y Anycubic Kobra 2 Neo (un color, 800.000 COP).
 
 ## Verificar antes de subir

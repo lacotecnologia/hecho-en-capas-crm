@@ -2,7 +2,11 @@
  * Reglas de la cotización. Las usan el servidor, la pantalla (resumen en
  * vivo) y la versión de prueba, para que todos den el mismo total.
  */
-import { precioMaximoComercial } from './costos.js'
+import {
+  esPrecioRedondo,
+  precioMaximoComercial,
+  redondearPrecio,
+} from './costos.js'
 
 // ---------- Estados ----------
 
@@ -320,6 +324,13 @@ export function validarPreciosCotizacion(
       )
     }
     const maximo = precioMaximoComercial(p.precioFabrica, topePct)
+    // El precio de fábrica siempre se acepta, aunque venga de antes del redondeo al mil.
+    if (l.precioVenta !== p.precioFabrica && !esPrecioRedondo(l.precioVenta)) {
+      return malo(
+        `El precio de "${p.nombre}" debe ser redondo a mil: usa ${fmt(Math.min(maximo, Math.max(p.precioFabrica, redondearPrecio(l.precioVenta))))}.`,
+        'lineas'
+      )
+    }
     if (l.precioVenta < p.precioFabrica) {
       return malo(
         `El precio de "${p.nombre}" no puede ser menor que el de fábrica (${fmt(p.precioFabrica)}).`,

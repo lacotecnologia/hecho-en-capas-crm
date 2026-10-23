@@ -51,7 +51,7 @@ type EstadoDemo = {
   pedidos: PedidosDemo
 }
 
-const CLAVE = 'hec-demo-v6'
+const CLAVE = 'hec-demo-v7'
 const MAX_INTENTOS = 5
 const MINUTOS_BLOQUEO = 15
 

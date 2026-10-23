@@ -1,7 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { calcularCosto, precioMaximoComercial } from '@shared/costos'
+import {
+  calcularCosto,
+  esPrecioRedondo,
+  precioMaximoComercial,
+  redondearPrecio,
+} from '@shared/costos'
 import {
   CATEGORIAS_SUGERIDAS,
   ESTADOS_INFO,
@@ -684,7 +689,7 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
                   {formatoPesos(calculo.costo)}
                 </dd>
                 <dt className='text-muted-foreground'>
-                  + margen {f.margenPct} %, redondeado
+                  + margen {f.margenPct} %, redondeado al mil
                 </dt>
                 <dd className='text-end tabular-nums'>
                   {formatoPesos(calculo.precioCalculado)}
@@ -716,8 +721,14 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
                     unidad='COP'
                     valor={f.precioManual}
                     onChange={set('precioManual')}
-                    ayuda={`Mínimo ${formatoPesos(calculo.precioCalculado)} (el calculado).`}
-                    error={errorDe('precioManual')}
+                    ayuda={`Redondo a mil. Mínimo ${formatoPesos(calculo.precioCalculado)} (el calculado).`}
+                    error={
+                      errorDe('precioManual') ??
+                      (Number(f.precioManual) > 0 &&
+                      !esPrecioRedondo(Number(f.precioManual))
+                        ? `Debe ser redondo a mil: usa ${formatoPesos(redondearPrecio(Number(f.precioManual)))}.`
+                        : undefined)
+                    }
                   />
                   <Campo
                     etiqueta='¿Por qué lo subes?'

@@ -43,6 +43,13 @@
       "when": 1792689742156,
       "tag": "0005_cobros_y_entregas",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792720014030,
+      "tag": "0006_redondeo_al_mil",
+      "breakpoints": true
     }
   ]
 }

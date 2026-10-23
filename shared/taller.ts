@@ -4,6 +4,8 @@
  * respondan exactamente igual. Los mensajes se muestran tal cual al usuario.
  */
 
+import { esPrecioRedondo, redondearPrecio } from './costos.js'
+
 // ---------- Tipos que viajan entre servidor y pantalla ----------
 
 export type Impresora = {
@@ -392,6 +394,12 @@ export function validarPrecio(
     )
   }
   if (entrada.precioManual !== null) {
+    if (!esPrecioRedondo(entrada.precioManual)) {
+      return malo(
+        `El precio debe ser redondo a mil. Usa ${redondearPrecio(entrada.precioManual).toLocaleString('es-CO')}.`,
+        'precioManual'
+      )
+    }
     if (entrada.precioManual < precioCalculado) {
       return malo(
         `El precio a mano solo puede subir el calculado, no bajarlo. El mínimo es ${precioCalculado.toLocaleString('es-CO')}.`,
