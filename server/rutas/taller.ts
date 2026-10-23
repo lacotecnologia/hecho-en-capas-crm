@@ -23,7 +23,7 @@ import {
   productos,
 } from '../db/schema.js'
 import { conSesion, soloRoles, type Variables } from '../sesion.js'
-import { permisoDeSubida, urlDeBlobValida } from '../subidas.js'
+import { hayAlmacenamiento, permisoDeSubida, urlDeBlobValida } from '../subidas.js'
 import { leerConfiguracion } from './configuracion.js'
 
 export const rutasTaller = new Hono<{ Variables: Variables }>()
@@ -411,7 +411,7 @@ rutasTaller.delete('/productos/:id/archivos/:archivoId', deTaller, async (c) => 
         .where(eq(productoArchivos.id, otra.id))
     }
   }
-  if (process.env.BLOB_READ_WRITE_TOKEN && urlDeBlobValida(archivo.url)) {
+  if (hayAlmacenamiento() && urlDeBlobValida(archivo.url)) {
     await del(archivo.url).catch((error) => console.error('[borrar archivo]', error))
   }
   return c.json({ producto: await detalle(id, true) })

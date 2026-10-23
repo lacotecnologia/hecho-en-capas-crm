@@ -22,13 +22,17 @@ export async function subirFoto(
   }
   if (ES_PRUEBA) return comoDataUrl(await reducirImagen(archivo, 900, 0.75))
   const contenido = await reducirImagen(archivo, 1600, 0.82)
-  const { upload } = await import('@vercel/blob/client')
+  const { uploadPresigned } = await import('@vercel/blob/client')
   try {
-    const r = await upload(`${destino.carpeta}/${Date.now()}.webp`, contenido, {
-      access: 'public',
-      handleUploadUrl: destino.permiso,
-      contentType: 'image/webp',
-    })
+    const r = await uploadPresigned(
+      `${destino.carpeta}/${Date.now()}.webp`,
+      contenido,
+      {
+        access: 'public',
+        handleUploadUrl: destino.permiso,
+        contentType: 'image/webp',
+      }
+    )
     return r.url
   } catch (error) {
     const texto = error instanceof Error ? error.message : ''

@@ -1,4 +1,8 @@
-import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
+import { issueSignedToken } from '@vercel/blob'
+import {
+  handleUploadPresigned,
+  type HandleUploadPresignedBody,
+} from '@vercel/blob/client'
 import { type Context } from 'hono'
 
 const TIPOS_ARCHIVOS = [
@@ -15,12 +19,21 @@ const TIPOS_ARCHIVOS = [
 
 export const SOLO_IMAGENES = ['image/jpeg', 'image/png', 'image/webp']
 
+const TAMANO_MAXIMO = 100 * 1024 * 1024 // 100 MB
+
+/** Hay almacenamiento conectado: el nuevo de Vercel (BLOB_STORE_ID) o una llave fija. */
+export function hayAlmacenamiento() {
+  return Boolean(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN)
+}
+
 /**
- * Entrega al navegador un permiso temporal para subir un archivo directo
- * a Vercel Blob (así no pasa por la función y no hay límite de tamaño).
+ * Entrega al navegador una dirección firmada y temporal para subir un archivo
+ * directo a Vercel Blob (así no pasa por la función y no hay límite de tamaño).
+ * Funciona con la conexión nueva de Vercel (sin llave fija) y con la antigua.
+ * Las rutas que la usan ya exigen sesión y rol antes de llegar aquí.
  */
 export async function permisoDeSubida(c: Context, tipos = TIPOS_ARCHIVOS) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!hayAlmacenamiento()) {
     return c.json(
       {
         mensaje:
@@ -29,16 +42,30 @@ export async function permisoDeSubida(c: Context, tipos = TIPOS_ARCHIVOS) {
       503
     )
   }
-  const cuerpo = (await c.req.json()) as HandleUploadBody
+  const cuerpo = (await c.req.json()) as HandleUploadPresignedBody
   try {
-    const respuesta = await handleUpload({
+    const respuesta = await handleUploadPresigned({
       body: cuerpo,
       request: c.req.raw,
-      onBeforeGenerateToken: async () => ({
-        allowedContentTypes: tipos,
-        maximumSizeInBytes: 100 * 1024 * 1024,
-        addRandomSuffix: true,
-      }),
+      getSignedToken: async (pathname) => {
+        const validoHasta = Date.now() + 10 * 60 * 1000
+        return {
+          token: await issueSignedToken({
+            pathname,
+            operations: ['put'],
+            allowedContentTypes: tipos,
+            maximumSizeInBytes: TAMANO_MAXIMO,
+            validUntil: validoHasta,
+          }),
+          urlOptions: {
+            allowedContentTypes: tipos,
+            maximumSizeInBytes: TAMANO_MAXIMO,
+            validUntil: validoHasta,
+            addRandomSuffix: true,
+            allowOverwrite: false,
+          },
+        }
+      },
     })
     return c.json(respuesta)
   } catch (error) {

@@ -77,10 +77,10 @@ export async function subirArchivo(productoId: number, archivo: File) {
   const contenido =
     tipo === 'imagen' ? await reducirImagen(archivo, 1600, 0.85) : archivo
   const nombre = tipo === 'imagen' ? `${nombreBase}.webp` : archivo.name
-  const { upload } = await import('@vercel/blob/client')
+  const { uploadPresigned } = await import('@vercel/blob/client')
   let url: string
   try {
-    const resultado = await upload(
+    const resultado = await uploadPresigned(
       `productos/${productoId}/${nombre}`,
       contenido,
       {

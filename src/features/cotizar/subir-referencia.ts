@@ -18,9 +18,9 @@ export async function subirReferencia(cotizacionId: number, archivo: File) {
     return agregarImagen(cotizacionId, { url, nombre })
   }
   const contenido = await reducirImagen(archivo, 1600, 0.85)
-  const { upload } = await import('@vercel/blob/client')
+  const { uploadPresigned } = await import('@vercel/blob/client')
   try {
-    const r = await upload(
+    const r = await uploadPresigned(
       `cotizaciones/${cotizacionId}/${nombre}`,
       contenido,
       {
