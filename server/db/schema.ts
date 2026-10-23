@@ -94,6 +94,8 @@ export const productos = pgTable(
     /** solicitud | diseno | costeo | activo | inactivo */
     estado: text('estado').notNull().default('costeo'),
     multicolor: boolean('multicolor').notNull().default(false),
+    /** El comercial escoge el color entre las bobinas preaprobadas (producto_colores). */
+    escogeColor: boolean('escoge_color').notNull().default(false),
     diasFabricacion: integer('dias_fabricacion').notNull().default(2),
     impresoraId: integer('impresora_id').references(() => impresoras.id),
     bobinaId: integer('bobina_id').references(() => bobinas.id),
@@ -114,12 +116,33 @@ export const productos = pgTable(
     notaAjuste: text('nota_ajuste').notNull().default(''),
     /** Precio con el que trabaja el comercial. */
     precioFabrica: integer('precio_fabrica').notNull().default(0),
+    /** Total de unidades impresas. Con colores, es la suma del stock de cada color. */
     stock: integer('stock').notNull().default(0),
     creadoPor: integer('creado_por').references(() => usuarios.id),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),
   },
   (t) => [index('productos_estado_idx').on(t.estado)]
+)
+
+/**
+ * Colores preaprobados de un producto (solo si escoge_color): cada uno es una
+ * bobina del taller, con su propio stock de unidades ya impresas.
+ */
+export const productoColores = pgTable(
+  'producto_colores',
+  {
+    id: serial('id').primaryKey(),
+    productoId: integer('producto_id')
+      .notNull()
+      .references(() => productos.id, { onDelete: 'cascade' }),
+    bobinaId: integer('bobina_id')
+      .notNull()
+      .references(() => bobinas.id),
+    stock: integer('stock').notNull().default(0),
+    orden: integer('orden').notNull().default(0),
+  },
+  (t) => [uniqueIndex('producto_colores_unico_idx').on(t.productoId, t.bobinaId)]
 )
 
 /** Fotos y archivos (3MF, STL) de cada producto. */
@@ -146,6 +169,8 @@ export const movimientosStock = pgTable('movimientos_stock', {
   /** produccion | venta | ajuste */
   tipo: text('tipo').notNull(),
   cantidad: integer('cantidad').notNull(),
+  /** Color (bobina) del stock que se movió, si el producto tiene colores. */
+  bobinaId: integer('bobina_id').references(() => bobinas.id),
   nota: text('nota').notNull().default(''),
   pedidoId: integer('pedido_id'),
   ordenId: integer('orden_id'),
@@ -231,6 +256,10 @@ export const cotizacionLineas = pgTable('cotizacion_lineas', {
   personalizado: boolean('personalizado').notNull().default(false),
   diasFabricacion: integer('dias_fabricacion').notNull().default(0),
   desdeStock: boolean('desde_stock').notNull().default(false),
+  /** Color escogido (bobina preaprobada); null si el producto no escoge color. */
+  bobinaId: integer('bobina_id').references(() => bobinas.id),
+  color: text('color').notNull().default(''),
+  colorHex: text('color_hex').notNull().default(''),
 })
 
 /** Cargos extra: envío, diseño adicional, urgencia… */
@@ -325,6 +354,9 @@ export const pedidoLineas = pgTable('pedido_lineas', {
   personalizado: boolean('personalizado').notNull().default(false),
   /** Se descontó del stock al crear el pedido: no se imprime. */
   desdeStock: boolean('desde_stock').notNull().default(false),
+  bobinaId: integer('bobina_id').references(() => bobinas.id),
+  color: text('color').notNull().default(''),
+  colorHex: text('color_hex').notNull().default(''),
 })
 
 export const pedidoCargos = pgTable('pedido_cargos', {
@@ -353,7 +385,10 @@ export const ordenesProduccion = pgTable(
     /** espera_anticipo | en_cola | imprimiendo | postproceso | listo | cancelada */
     estado: text('estado').notNull().default('en_cola'),
     impresoraId: integer('impresora_id').references(() => impresoras.id),
+    /** Bobina con la que se imprimió (la elige el taller al empezar). */
     bobinaId: integer('bobina_id').references(() => bobinas.id),
+    /** Color que pidió el cliente (o el de stock); el taller debe usar ese color. */
+    colorBobinaId: integer('color_bobina_id').references(() => bobinas.id),
     operadorId: integer('operador_id').references(() => usuarios.id),
     inicio: timestamp('inicio', { withTimezone: true }),
     finEstimado: timestamp('fin_estimado', { withTimezone: true }),

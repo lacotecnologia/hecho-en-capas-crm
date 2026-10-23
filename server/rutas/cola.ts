@@ -1,10 +1,12 @@
 import { and, asc, desc, eq, gte, inArray, or, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { type Context, Hono } from 'hono'
 import {
   estimarOrden,
   type EstadoOrden,
   type OrdenCola,
   sumarHoras,
+  validarBobinaParaColor,
   validarFalla,
   validarImpresoraParaOrden,
 } from '../../shared/pedidos.js'
@@ -13,7 +15,6 @@ import {
   bobinas,
   clientes,
   impresoras,
-  movimientosStock,
   ordenesProduccion,
   pedidos,
   productoArchivos,
@@ -22,6 +23,7 @@ import {
 } from '../db/schema.js'
 import { anotar, recalcularPedido, type Tx } from '../pedidos-logica.js'
 import { conSesion, soloRoles, type Variables } from '../sesion.js'
+import { coloresDe, moverStock } from '../stock.js'
 
 export const rutasCola = new Hono<{ Variables: Variables }>()
 
@@ -31,6 +33,9 @@ const ve = soloRoles('admin', 'fabricacion', 'comercial')
 const deTaller = soloRoles('admin', 'fabricacion')
 
 const NO_EXISTE = 'No encontramos esa orden. Puede que la hayan cancelado.'
+
+/** La bobina del color que pidió el cliente (distinta de la que se usó al imprimir). */
+const colorPedido = alias(bobinas, 'color_pedido')
 
 async function listar(ids?: number[]): Promise<OrdenCola[]> {
   const db = getDb()
@@ -52,9 +57,16 @@ async function listar(ids?: number[]): Promise<OrdenCola[]> {
       fechaCompromiso: pedidos.fechaCompromiso,
       cliente: clientes.nombre,
       operador: usuarios.nombre,
+      color: {
+        bobinaId: colorPedido.id,
+        color: colorPedido.color,
+        colorHex: colorPedido.colorHex,
+        material: colorPedido.material,
+      },
     })
     .from(ordenesProduccion)
     .innerJoin(productos, eq(productos.id, ordenesProduccion.productoId))
+    .leftJoin(colorPedido, eq(colorPedido.id, ordenesProduccion.colorBobinaId))
     .leftJoin(pedidos, eq(pedidos.id, ordenesProduccion.pedidoId))
     .leftJoin(clientes, eq(clientes.id, pedidos.clienteId))
     .leftJoin(usuarios, eq(usuarios.id, ordenesProduccion.operadorId))
@@ -85,7 +97,7 @@ async function listar(ids?: number[]): Promise<OrdenCola[]> {
   const portada = new Map<number, string>()
   for (const f of fotos) if (!portada.has(f.productoId)) portada.set(f.productoId, f.url)
 
-  return filas.map(({ o, producto, pedidoCodigo, fechaCompromiso, cliente, operador }) => {
+  return filas.map(({ o, producto, pedidoCodigo, fechaCompromiso, cliente, operador, color }) => {
     const est = estimarOrden(producto.horas, producto.unidadesPorCama, o.cantidad)
     return {
       id: o.id,
@@ -97,9 +109,10 @@ async function listar(ids?: number[]): Promise<OrdenCola[]> {
         imagen: portada.get(producto.id) ?? null,
         multicolor: producto.multicolor,
         impresoraSugeridaId: producto.impresoraId,
-        bobinaSugeridaId: producto.bobinaId,
+        bobinaSugeridaId: color?.bobinaId ?? producto.bobinaId,
       },
       cantidad: o.cantidad,
+      color: color?.bobinaId ? { ...color, bobinaId: color.bobinaId } : null,
       horas: est.horas,
       camas: est.camas,
       pedido:
@@ -201,9 +214,14 @@ rutasCola.post('/:id/empezar', deTaller, async (c) => {
         campo: 'impresoraId',
       }
     }
-    if (bobinaId) {
-      const [b] = await tx.select({ id: bobinas.id }).from(bobinas).where(eq(bobinas.id, bobinaId))
-      if (!b) return { error: 'Esa bobina no existe.', campo: 'bobinaId' }
+    const [b] = bobinaId
+      ? await tx.select().from(bobinas).where(eq(bobinas.id, bobinaId))
+      : []
+    if (bobinaId && !b) return { error: 'Esa bobina no existe.', campo: 'bobinaId' }
+    if (o.colorBobinaId) {
+      const [pedida] = await tx.select().from(bobinas).where(eq(bobinas.id, o.colorBobinaId))
+      const vc = validarBobinaParaColor(pedida ?? null, b ?? null)
+      if (!vc.ok) return { error: vc.mensaje, campo: vc.campo }
     }
     const inicio = new Date()
     const est = estimarOrden(prod.horas, prod.unidadesPorCama, o.cantidad)
@@ -247,20 +265,18 @@ rutasCola.post('/:id/listo', deTaller, async (c) => {
   return mover(c, ['postproceso'], 'listo', async (tx, o) => {
     // Lo que se imprime para stock entra al inventario
     if (!o.pedidoId) {
-      await tx
-        .update(productos)
-        .set({ stock: sql`${productos.stock} + ${o.cantidad}`, actualizadoEn: new Date() })
-        .where(eq(productos.id, o.productoId))
-      await tx.insert(movimientosStock).values({
+      const m = await moverStock(tx, {
         productoId: o.productoId,
-        tipo: 'produccion',
+        bobinaId: o.colorBobinaId,
         cantidad: o.cantidad,
+        tipo: 'produccion',
         nota: `Impreso para stock (orden ${o.id})`,
         ordenId: o.id,
         usuarioId: u.id,
       })
+      if (!m.ok) return { error: m.error }
     }
-    return {}
+    return { finReal: o.finReal }
   })
 })
 
@@ -293,10 +309,19 @@ rutasCola.post('/stock', deTaller, async (c) => {
       400
     )
   }
+  let colorBobinaId: number | null = null
+  if (p.escogeColor) {
+    const colores = (await coloresDe(db, [p.id])).get(p.id) ?? []
+    const elegido = colores.find((x) => x.bobinaId === Number(cuerpo.bobinaId))
+    if (!elegido) {
+      return c.json({ mensaje: 'Escoge de qué color vas a imprimir.', campo: 'bobinaId' }, 400)
+    }
+    colorBobinaId = elegido.bobinaId
+  }
   const id = await db.transaction(async (tx) => {
     const [o] = await tx
       .insert(ordenesProduccion)
-      .values({ productoId, cantidad, estado: 'en_cola', creadoPor: u.id })
+      .values({ productoId, cantidad, colorBobinaId, estado: 'en_cola', creadoPor: u.id })
       .returning({ id: ordenesProduccion.id })
     await anotar(tx, { entidad: 'orden', entidadId: o.id, a: 'en_cola', nota: 'Para stock', usuarioId: u.id })
     return o.id

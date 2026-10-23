@@ -99,7 +99,7 @@ rutasSeguimiento.get('/:codigo', async (c) => {
     fechaCompromiso: p.fechaCompromiso?.toISOString() ?? null,
     modalidad: p.modalidad as SeguimientoPublico['modalidad'],
     lineas: lineas.map((l) => ({
-      nombre: l.nombre,
+      nombre: l.color ? `${l.nombre} · ${l.color}` : l.nombre,
       cantidad: l.cantidad,
       imagen: l.imagen,
       estado: lineaCliente(l.desdeStock, l.id),

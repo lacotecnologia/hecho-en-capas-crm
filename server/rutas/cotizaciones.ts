@@ -11,6 +11,7 @@ import {
   calcularCotizacion,
   codigoCotizacion,
   leerEntradaCotizacion,
+  validarColoresCotizacion,
   validarParaEnviar,
   validarPreciosCotizacion,
 } from '../../shared/cotizacion.js'
@@ -28,6 +29,7 @@ import {
   usuarios,
 } from '../db/schema.js'
 import { conSesion, soloRoles, type UsuarioSesion, type Variables } from '../sesion.js'
+import { coloresDe } from '../stock.js'
 import { permisoDeSubida, SOLO_IMAGENES, urlDeBlobValida } from '../subidas.js'
 import { leerConfiguracion } from './configuracion.js'
 
@@ -122,6 +124,9 @@ async function detalle(cot: FilaCot, u: UsuarioSesion): Promise<CotizacionDetall
     personalizado: l.personalizado,
     diasFabricacion: l.diasFabricacion,
     desdeStock: l.desdeStock,
+    bobinaId: l.bobinaId,
+    color: l.color,
+    colorHex: l.colorHex,
   }))
   const resumen = calcularCotizacion(
     lineasOut,
@@ -187,6 +192,20 @@ async function armar(entrada: CotizacionEntrada) {
   const mapa = new Map(prods.map((p) => [p.id, p]))
   const v = validarPreciosCotizacion(entrada.lineas, mapa, entrada.descuento, config.tope_comercial)
   if (!v.ok) return v
+  const colores = await coloresDe(
+    db,
+    prods.filter((p) => p.escogeColor).map((p) => p.id)
+  )
+  const vc = validarColoresCotizacion(
+    entrada.lineas,
+    new Map(
+      prods.map((p) => [
+        p.id,
+        { nombre: p.nombre, escogeColor: p.escogeColor, colores: colores.get(p.id) ?? [] },
+      ])
+    )
+  )
+  if (!vc.ok) return vc
 
   const fotos = ids.length
     ? await db
@@ -200,6 +219,10 @@ async function armar(entrada: CotizacionEntrada) {
 
   const lineas: LineaCotizacion[] = entrada.lineas.map((l) => {
     const p = mapa.get(l.productoId)!
+    const color = p.escogeColor
+      ? (colores.get(p.id) ?? []).find((c) => c.bobinaId === l.bobinaId)
+      : undefined
+    const stock = p.escogeColor ? (color?.stock ?? 0) : p.stock
     return {
       productoId: p.id,
       nombre: p.nombre,
@@ -210,7 +233,10 @@ async function armar(entrada: CotizacionEntrada) {
       precioVenta: l.precioVenta,
       personalizado: p.tipo === 'personalizado',
       diasFabricacion: p.diasFabricacion,
-      desdeStock: p.stock >= l.cantidad,
+      desdeStock: stock >= l.cantidad,
+      bobinaId: color?.bobinaId ?? null,
+      color: color?.color ?? '',
+      colorHex: color?.colorHex ?? '',
     }
   })
   const resumen = calcularCotizacion(
@@ -393,7 +419,12 @@ rutasCotizaciones.post('/:id/enviar', vende, async (c) => {
   }
   const db = getDb()
   const lineas = await db
-    .select({ productoId: cotizacionLineas.productoId, cantidad: cotizacionLineas.cantidad, precioVenta: cotizacionLineas.precioVenta })
+    .select({
+      productoId: cotizacionLineas.productoId,
+      cantidad: cotizacionLineas.cantidad,
+      precioVenta: cotizacionLineas.precioVenta,
+      bobinaId: cotizacionLineas.bobinaId,
+    })
     .from(cotizacionLineas)
     .where(eq(cotizacionLineas.cotizacionId, r0.cot.id))
     .orderBy(asc(cotizacionLineas.orden))

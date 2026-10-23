@@ -17,12 +17,18 @@ import {
   leerEntradaCotizacion,
   validarCliente,
   validarParaEnviar,
+  validarColoresCotizacion,
   validarPreciosCotizacion,
 } from '@shared/cotizacion'
 import { type Rol } from '@shared/roles'
 import { skuDe } from '@shared/taller'
 import { ApiError } from '@/lib/api'
-import { portadaDe, type TallerDemo } from './taller-demo'
+import {
+  coloresDemo,
+  portadaDe,
+  stockDisponibleDemo,
+  type TallerDemo,
+} from './taller-demo'
 
 export type CotizacionDemo = {
   id: number
@@ -239,8 +245,19 @@ export function atenderCotizar(
       config.tope_comercial
     )
     if (!v.ok) return fallo(400, v.mensaje, v.campo)
+    const vc = validarColoresCotizacion(
+      e.lineas,
+      new Map(
+        taller.productos.map((p) => [
+          p.id,
+          { nombre: p.nombre, escogeColor: p.escogeColor, colores: coloresDemo(taller, p) },
+        ])
+      )
+    )
+    if (!vc.ok) return fallo(400, vc.mensaje, vc.campo)
     return e.lineas.map((l): LineaCotizacion => {
       const p = mapa.get(l.productoId)!
+      const color = coloresDemo(taller, p).find((x) => x.bobinaId === l.bobinaId)
       return {
         productoId: p.id,
         nombre: p.nombre,
@@ -251,7 +268,11 @@ export function atenderCotizar(
         precioVenta: l.precioVenta,
         personalizado: p.tipo === 'personalizado',
         diasFabricacion: p.diasFabricacion,
-        desdeStock: p.stock >= l.cantidad,
+        desdeStock:
+          stockDisponibleDemo(taller, p.id, color?.bobinaId ?? null) >= l.cantidad,
+        bobinaId: color?.bobinaId ?? null,
+        color: color?.color ?? '',
+        colorHex: color?.colorHex ?? '',
       }
     })
   }
@@ -514,6 +535,8 @@ export function atenderCotizar(
       tipo: 'personalizado',
       estado: 'solicitud',
       multicolor: false,
+      escogeColor: false,
+      coloresStock: [],
       impresoraId: null,
       bobinaId: null,
       gramos: 0,

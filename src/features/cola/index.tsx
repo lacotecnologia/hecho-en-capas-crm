@@ -44,6 +44,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Campo, CampoNumero } from '@/components/campo'
+import { BotonesColor, EtiquetaColor } from '@/components/color'
 import { Pagina } from '@/components/layout/pagina'
 import {
   accionOrden,
@@ -351,6 +352,13 @@ function TarjetaImpresora({
                   {o.producto.nombre}{' '}
                   <span className='text-muted-foreground'>× {o.cantidad}</span>
                 </p>
+                {o.color && (
+                  <EtiquetaColor
+                    color={`En ${o.color.color}`}
+                    colorHex={o.color.colorHex}
+                    className='mt-0.5'
+                  />
+                )}
                 <p className='text-sm'>
                   <ParaQuien o={o} />
                 </p>
@@ -416,6 +424,7 @@ function TarjetaImpresora({
               </p>
               <p className='font-medium'>
                 {siguiente.producto.nombre} × {siguiente.cantidad}
+                {siguiente.color && ` en ${siguiente.color.color}`}
               </p>
             </div>
             {taller && (
@@ -461,6 +470,13 @@ function TarjetaOrden({
               {o.producto.nombre}{' '}
               <span className='text-muted-foreground'>× {o.cantidad}</span>
             </p>
+            {o.color && (
+              <EtiquetaColor
+                color={`En ${o.color.color}`}
+                colorHex={o.color.colorHex}
+                className='my-0.5'
+              />
+            )}
             <p className='text-sm'>
               <ParaQuien o={o} />
             </p>
@@ -629,7 +645,8 @@ function FormEmpezar({
       <DialogHeader>
         <DialogTitle>Empezar a imprimir</DialogTitle>
         <DialogDescription>
-          {o.producto.nombre} × {o.cantidad} · {o.camas}{' '}
+          {o.producto.nombre} × {o.cantidad}
+          {o.color && ` en ${o.color.color}`} · {o.camas}{' '}
           {o.camas === 1 ? 'impresión' : 'impresiones'} · {textoHoras(o.horas)}
         </DialogDescription>
       </DialogHeader>
@@ -669,7 +686,11 @@ function FormEmpezar({
       </fieldset>
       <Campo
         etiqueta='Bobina que vas a usar'
-        ayuda='Opcional. Sirve para saber cuánto filamento se gasta.'
+        ayuda={
+          o.color
+            ? `El cliente lo pidió en ${o.color.color} (${o.color.material}): solo aparecen bobinas de ese color.`
+            : 'Opcional. Sirve para saber cuánto filamento se gasta.'
+        }
       >
         {(id) => (
           <Select value={bobinaId} onValueChange={setBobinaId}>
@@ -678,7 +699,15 @@ function FormEmpezar({
             </SelectTrigger>
             <SelectContent>
               {bobinas
-                .filter((b) => b.activa)
+                .filter((b) => b.activa || String(b.id) === bobinaId)
+                .filter(
+                  (b) =>
+                    !o.color ||
+                    (b.color.trim().toLowerCase() ===
+                      o.color.color.trim().toLowerCase() &&
+                      b.material.trim().toLowerCase() ===
+                        o.color.material.trim().toLowerCase())
+                )
                 .map((b) => (
                   <SelectItem key={b.id} value={String(b.id)}>
                     <span
@@ -854,7 +883,9 @@ function FormStock({ onCerrar }: { onCerrar: () => void }) {
     campo?: string
   } | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [color, setColor] = useState<number | null>(null)
   const elegido = opciones.find((p) => String(p.id) === productoId)
+  const colorElegido = elegido?.colores.find((c) => c.bobinaId === color)
 
   return (
     <form
@@ -864,7 +895,7 @@ function FormStock({ onCerrar }: { onCerrar: () => void }) {
         setError(null)
         setEnviando(true)
         try {
-          await ordenParaStock(Number(productoId), Number(cantidad))
+          await ordenParaStock(Number(productoId), Number(cantidad), color)
           queryClient.invalidateQueries({ queryKey: ['cola'] })
           toast.success('Quedó en la cola. Al terminarlo, se suma al stock.')
           onCerrar()
@@ -891,7 +922,13 @@ function FormStock({ onCerrar }: { onCerrar: () => void }) {
         error={error?.campo === 'productoId' ? error.mensaje : undefined}
       >
         {(id) => (
-          <Select value={productoId} onValueChange={setProductoId}>
+          <Select
+            value={productoId}
+            onValueChange={(v) => {
+              setProductoId(v)
+              setColor(null)
+            }}
+          >
             <SelectTrigger id={id} className='w-full'>
               <SelectValue placeholder='Elige un producto del catálogo' />
             </SelectTrigger>
@@ -905,12 +942,40 @@ function FormStock({ onCerrar }: { onCerrar: () => void }) {
           </Select>
         )}
       </Campo>
+      {elegido?.escogeColor && (
+        <div className='grid gap-2'>
+          <span className='text-sm font-medium'>¿De qué color?</span>
+          <BotonesColor
+            etiqueta='Color a imprimir'
+            opciones={elegido.colores.map((c) => ({
+              bobinaId: c.bobinaId,
+              color: c.color,
+              colorHex: c.colorHex,
+              detalle: `hay ${c.stock}`,
+            }))}
+            seleccion={color ? [color] : []}
+            onChange={([id]) => setColor(id ?? null)}
+            invalido={error?.campo === 'bobinaId'}
+          />
+          {error?.campo === 'bobinaId' && (
+            <p className='text-sm font-medium text-destructive'>
+              {error.mensaje}
+            </p>
+          )}
+        </div>
+      )}
       <CampoNumero
         etiqueta='¿Cuántas unidades?'
         valor={cantidad}
         onChange={setCantidad}
         error={error?.campo === 'cantidad' ? error.mensaje : undefined}
-        ayuda={elegido ? `Ahora hay ${elegido.stock} en stock.` : undefined}
+        ayuda={
+          colorElegido
+            ? `Ahora hay ${colorElegido.stock} en ${colorElegido.color.toLowerCase()}.`
+            : elegido
+              ? `Ahora hay ${elegido.stock} en stock.`
+              : undefined
+        }
       />
       {error && !error.campo && (
         <p className='text-sm font-medium text-destructive'>{error.mensaje}</p>
@@ -919,7 +984,10 @@ function FormStock({ onCerrar }: { onCerrar: () => void }) {
         <Button type='button' variant='outline' onClick={onCerrar}>
           Cancelar
         </Button>
-        <Button type='submit' disabled={!productoId || enviando}>
+        <Button
+          type='submit'
+          disabled={!productoId || (!!elegido?.escogeColor && !color) || enviando}
+        >
           <Plus /> Agregar a la cola
         </Button>
       </DialogFooter>

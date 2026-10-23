@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { mensajeDeError } from '@/lib/api'
 import { tieneRol, useSesion } from '@/lib/sesion'
 import { Button } from '@/components/ui/button'
+import { EtiquetaColor } from '@/components/color'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
@@ -197,7 +198,7 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
             </CardHeader>
             <CardContent className='grid gap-3'>
               {c.lineas.map((l) => (
-                <div key={l.productoId} className='flex items-center gap-3'>
+                <div key={`${l.productoId}-${l.bobinaId ?? 0}`} className='flex items-center gap-3'>
                   <div className='size-14 shrink-0 overflow-hidden rounded-lg bg-muted'>
                     {l.imagen ? (
                       <img
@@ -210,7 +211,10 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
                     )}
                   </div>
                   <div className='min-w-0 flex-1'>
-                    <p className='font-medium'>{l.nombre}</p>
+                    <p className='flex flex-wrap items-center gap-2 font-medium'>
+                      {l.nombre}
+                      <EtiquetaColor color={l.color} colorHex={l.colorHex} />
+                    </p>
                     <p className='text-sm text-muted-foreground'>
                       {l.cantidad} × {formatoPesos(l.precioVenta)}
                       {l.personalizado && ' · personalizado'}

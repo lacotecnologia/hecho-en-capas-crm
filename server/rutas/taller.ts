@@ -4,11 +4,14 @@ import { Hono } from 'hono'
 import { calcularCosto } from '../../shared/costos.js'
 import {
   type ArchivoProducto,
+  type ColorProducto,
+  planColores,
   type ProductoCosto,
   type ProductoDetalle,
   type ProductoEntrada,
   type ProductoResumen,
   skuDe,
+  validarAjusteStock,
   validarBobina,
   validarImpresora,
   validarPrecio,
@@ -18,11 +21,12 @@ import { getDb } from '../db/index.js'
 import {
   bobinas,
   impresoras,
-  movimientosStock,
   productoArchivos,
+  productoColores,
   productos,
 } from '../db/schema.js'
 import { conSesion, soloRoles, type Variables } from '../sesion.js'
+import { coloresDe, moverStock } from '../stock.js'
 import { hayAlmacenamiento, permisoDeSubida, urlDeBlobValida } from '../subidas.js'
 import { leerConfiguracion } from './configuracion.js'
 
@@ -123,7 +127,11 @@ async function portadas(ids: number[]) {
   return mapa
 }
 
-function resumen(p: FilaProducto, portada: string | null): ProductoResumen {
+function resumen(
+  p: FilaProducto,
+  portada: string | null,
+  colores: ColorProducto[]
+): ProductoResumen {
   return {
     id: p.id,
     sku: p.sku ?? skuDe(p.id),
@@ -133,6 +141,8 @@ function resumen(p: FilaProducto, portada: string | null): ProductoResumen {
     tipo: p.tipo as ProductoResumen['tipo'],
     estado: p.estado as ProductoResumen['estado'],
     multicolor: p.multicolor,
+    escogeColor: p.escogeColor,
+    colores: p.escogeColor ? colores : [],
     precioFabrica: p.precioFabrica,
     diasFabricacion: p.diasFabricacion,
     stock: p.stock,
@@ -179,7 +189,8 @@ async function detalle(id: number, verCostos: boolean) {
     esPortada: a.esPortada,
   }))
   const portada = lista.find((a) => a.tipo === 'imagen')?.url ?? null
-  const datos: ProductoDetalle = { ...resumen(p, portada), archivos: lista }
+  const colores = (await coloresDe(db, [id])).get(id) ?? []
+  const datos: ProductoDetalle = { ...resumen(p, portada, colores), archivos: lista }
   if (verCostos) datos.costos = costos(p)
   return datos
 }
@@ -223,10 +234,26 @@ async function prepararProducto(cuerpo: Record<string, unknown>) {
   const precio = validarPrecio(e, calculo.precioCalculado, imp ?? null)
   if (!precio.ok) return precio
 
+  if (e.colores.length) {
+    const existen = await db
+      .select({ id: bobinas.id })
+      .from(bobinas)
+      .where(inArray(bobinas.id, e.colores))
+    if (existen.length !== e.colores.length) {
+      return {
+        ok: false as const,
+        mensaje: 'Uno de los colores ya no existe. Vuelve a marcarlos.',
+        campo: 'colores',
+      }
+    }
+  }
+
+  const { colores, ...resto } = e
   return {
     ok: true as const,
+    colores,
     fila: {
-      ...e,
+      ...resto,
       precioManual:
         e.precioManual !== null && e.precioManual > calculo.precioCalculado
           ? e.precioManual
@@ -248,8 +275,14 @@ rutasTaller.get('/productos', veCatalogo, async (c) => {
     .from(productos)
     .orderBy(desc(productos.actualizadoEn))
   const fotos = await portadas(lista.map((p) => p.id))
+  const colores = await coloresDe(
+    getDb(),
+    lista.filter((p) => p.escogeColor).map((p) => p.id)
+  )
   return c.json({
-    productos: lista.map((p) => resumen(p, fotos.get(p.id) ?? null)),
+    productos: lista.map((p) =>
+      resumen(p, fotos.get(p.id) ?? null, colores.get(p.id) ?? [])
+    ),
   })
 })
 
@@ -265,72 +298,109 @@ rutasTaller.post('/productos', deTaller, async (c) => {
   const r = await prepararProducto(await c.req.json().catch(() => ({})))
   if (!r.ok) return c.json({ mensaje: r.mensaje, campo: r.campo }, 400)
   const db = getDb()
-  const [nuevo] = await db
-    .insert(productos)
-    .values({ ...r.fila, creadoPor: c.get('usuario').id })
-    .returning({ id: productos.id })
-  await db
-    .update(productos)
-    .set({ sku: skuDe(nuevo.id) })
-    .where(eq(productos.id, nuevo.id))
-  return c.json({ producto: await detalle(nuevo.id, true) }, 201)
+  const id = await db.transaction(async (tx) => {
+    const [nuevo] = await tx
+      .insert(productos)
+      .values({ ...r.fila, creadoPor: c.get('usuario').id })
+      .returning({ id: productos.id })
+    await tx
+      .update(productos)
+      .set({ sku: skuDe(nuevo.id) })
+      .where(eq(productos.id, nuevo.id))
+    if (r.fila.escogeColor && r.colores.length) {
+      await tx
+        .insert(productoColores)
+        .values(r.colores.map((bobinaId, orden) => ({ productoId: nuevo.id, bobinaId, orden })))
+    }
+    return nuevo.id
+  })
+  return c.json({ producto: await detalle(id, true) }, 201)
 })
 
 rutasTaller.patch('/productos/:id', deTaller, async (c) => {
   const id = idDe(c.req.param('id'))
   const r = await prepararProducto(await c.req.json().catch(() => ({})))
   if (!r.ok) return c.json({ mensaje: r.mensaje, campo: r.campo }, 400)
-  const [act] = await getDb()
-    .update(productos)
-    .set({ ...r.fila, actualizadoEn: new Date() })
-    .where(eq(productos.id, id))
-    .returning({ id: productos.id })
-  if (!act) return c.json({ mensaje: NO_EXISTE_PRODUCTO }, 404)
+  const resultado = await getDb().transaction(async (tx) => {
+    const [antes] = await tx
+      .select()
+      .from(productos)
+      .where(eq(productos.id, id))
+      .for('update')
+    if (!antes) return { error: NO_EXISTE_PRODUCTO, status: 404 as const }
+    const previos = (await coloresDe(tx, [id])).get(id) ?? []
+    const plan = planColores(
+      { escogeColor: antes.escogeColor, colores: previos, stock: antes.stock },
+      { escogeColor: r.fila.escogeColor, colores: r.colores, bobinaId: r.fila.bobinaId }
+    )
+    if (!plan.ok) return { error: plan.mensaje, campo: plan.campo, status: 400 as const }
+
+    await tx
+      .update(productos)
+      .set({ ...r.fila, actualizadoEn: new Date() })
+      .where(eq(productos.id, id))
+    if (plan.datos.quitar.length) {
+      await tx
+        .delete(productoColores)
+        .where(and(eq(productoColores.productoId, id), inArray(productoColores.bobinaId, plan.datos.quitar)))
+    }
+    if (plan.datos.agregar.length) {
+      await tx
+        .insert(productoColores)
+        .values(plan.datos.agregar.map((bobinaId) => ({ productoId: id, bobinaId })))
+    }
+    // El orden en que el taller marcó los colores es el que ve el comercial
+    for (const [orden, bobinaId] of r.colores.entries()) {
+      await tx
+        .update(productoColores)
+        .set({
+          orden,
+          ...(plan.datos.stockA === bobinaId ? { stock: antes.stock } : {}),
+        })
+        .where(and(eq(productoColores.productoId, id), eq(productoColores.bobinaId, bobinaId)))
+    }
+    return { ok: true as const }
+  })
+  if ('error' in resultado) {
+    return c.json(
+      { mensaje: resultado.error, campo: 'campo' in resultado ? resultado.campo : undefined },
+      resultado.status
+    )
+  }
   return c.json({ producto: await detalle(id, true) })
 })
 
 rutasTaller.post('/productos/:id/stock', deTaller, async (c) => {
   const id = idDe(c.req.param('id'))
   const cuerpo = await c.req.json().catch(() => ({}))
-  const cantidad = Number(cuerpo.cantidad)
-  const nota = String(cuerpo.nota ?? '').trim().slice(0, 200)
-  if (!Number.isInteger(cantidad) || cantidad === 0 || Math.abs(cantidad) > 10_000) {
-    return c.json(
-      { mensaje: 'Escribe cuántas unidades entran (ej. 10) o salen (ej. -2).' },
-      400
-    )
-  }
   const db = getDb()
   const resultado = await db.transaction(async (tx) => {
     const [p] = await tx
-      .select({ stock: productos.stock })
+      .select({ stock: productos.stock, escogeColor: productos.escogeColor })
       .from(productos)
       .where(eq(productos.id, id))
-      .for('update')
     if (!p) return { error: NO_EXISTE_PRODUCTO, status: 404 as const }
-    if (p.stock + cantidad < 0) {
-      return {
-        error: `No puedes sacar ${Math.abs(cantidad)}: solo hay ${p.stock} en stock.`,
-        status: 400 as const,
-      }
-    }
-    await tx
-      .update(productos)
-      .set({ stock: p.stock + cantidad, actualizadoEn: new Date() })
-      .where(eq(productos.id, id))
-    await tx.insert(movimientosStock).values({
+    const colores = (await coloresDe(tx, [id])).get(id) ?? []
+    const v = validarAjusteStock({ ...p, colores }, cuerpo)
+    if (!v.ok) return { error: v.mensaje, campo: v.campo, status: 400 as const }
+    const m = await moverStock(tx, {
       productoId: id,
-      tipo: cantidad > 0 ? 'produccion' : 'ajuste',
-      cantidad,
-      nota,
+      bobinaId: v.datos.bobinaId,
+      cantidad: v.datos.cantidad,
+      tipo: v.datos.cantidad > 0 ? 'produccion' : 'ajuste',
+      nota: v.datos.nota,
       usuarioId: c.get('usuario').id,
     })
-    return { stock: p.stock + cantidad }
+    if (!m.ok) return { error: m.error, status: 400 as const }
+    return { stock: m.stock }
   })
   if ('error' in resultado) {
-    return c.json({ mensaje: resultado.error }, resultado.status)
+    return c.json(
+      { mensaje: resultado.error, campo: 'campo' in resultado ? resultado.campo : undefined },
+      resultado.status
+    )
   }
-  return c.json(resultado)
+  return c.json({ ...resultado, producto: await detalle(id, true) })
 })
 
 // ===================== Archivos =====================

@@ -25,13 +25,11 @@ import {
   cotizacionLineas,
   cotizaciones,
   historialEstados,
-  movimientosStock,
   ordenesProduccion,
   pagos,
   pedidoCargos,
   pedidoLineas,
   pedidos,
-  productos,
   usuarios,
 } from '../db/schema.js'
 import {
@@ -43,6 +41,7 @@ import {
   type Tx,
 } from '../pedidos-logica.js'
 import { conSesion, soloRoles, type UsuarioSesion, type Variables } from '../sesion.js'
+import { moverStock, stockDisponible } from '../stock.js'
 import { permisoDeSubida, SOLO_IMAGENES, urlDeBlobValida } from '../subidas.js'
 
 export const rutasPedidos = new Hono<{ Variables: Variables }>()
@@ -155,6 +154,9 @@ async function detalle(id: number, u: UsuarioSesion): Promise<PedidoDetalle | nu
     personalizado: l.personalizado,
     desdeStock: l.desdeStock,
     estado: l.desdeStock ? 'listo' : (estadoLinea.get(l.id) ?? 'en_cola'),
+    bobinaId: l.bobinaId,
+    color: l.color,
+    colorHex: l.colorHex,
   }))
   const pagado = listaPagos.reduce((s, x) => s + x.monto, 0)
   const dinero = veDinero(u)
@@ -360,13 +362,12 @@ rutasPedidos.post('/', vende, async (c) => {
       .returning({ id: pedidos.id })
 
     for (const [orden, l] of lineas.entries()) {
-      // Lo que ya está impreso sale del stock (si alcanza para toda la línea)
-      const [prod] = await tx
-        .select({ stock: productos.stock, tipo: productos.tipo })
-        .from(productos)
-        .where(eq(productos.id, l.productoId))
-        .for('update')
-      const desdeStock = !l.personalizado && !!prod && prod.stock >= l.cantidad
+      // Lo que ya está impreso sale del stock (si alcanza para toda la línea,
+      // y del mismo color si el producto tiene colores)
+      const disponible = l.personalizado
+        ? 0
+        : await stockDisponible(tx, l.productoId, l.bobinaId)
+      const desdeStock = !l.personalizado && disponible >= l.cantidad
       const [linea] = await tx
         .insert(pedidoLineas)
         .values({
@@ -381,26 +382,28 @@ rutasPedidos.post('/', vende, async (c) => {
           precioVenta: l.precioVenta,
           personalizado: l.personalizado,
           desdeStock,
+          bobinaId: l.bobinaId,
+          color: l.color,
+          colorHex: l.colorHex,
         })
         .returning({ id: pedidoLineas.id })
       if (desdeStock) {
-        await tx
-          .update(productos)
-          .set({ stock: prod!.stock - l.cantidad, actualizadoEn: new Date() })
-          .where(eq(productos.id, l.productoId))
-        await tx.insert(movimientosStock).values({
+        const m = await moverStock(tx, {
           productoId: l.productoId,
-          tipo: 'venta',
+          bobinaId: l.bobinaId,
           cantidad: -l.cantidad,
+          tipo: 'venta',
           nota: `Para el pedido ${codigoPedido(anio, numero)}`,
           pedidoId: nuevo.id,
           usuarioId: u.id,
         })
+        if (!m.ok) throw new Error(m.error)
       } else {
         await tx.insert(ordenesProduccion).values({
           pedidoId: nuevo.id,
           lineaId: linea.id,
           productoId: l.productoId,
+          colorBobinaId: l.bobinaId,
           cantidad: l.cantidad,
           estado: l.personalizado && requiereAnticipo ? 'espera_anticipo' : 'en_cola',
           creadoPor: u.id,
@@ -528,20 +531,17 @@ rutasPedidos.post('/:id/cancelar', vende, async (c) => {
     const lineas = await tx.select().from(pedidoLineas).where(eq(pedidoLineas.pedidoId, p.id))
     // Lo que ya estaba impreso (o salió de stock) vuelve al stock
     const devolver = [
-      ...lineas.filter((l) => l.desdeStock).map((l) => ({ productoId: l.productoId, cantidad: l.cantidad })),
+      ...lineas
+        .filter((l) => l.desdeStock)
+        .map((l) => ({ productoId: l.productoId, bobinaId: l.bobinaId, cantidad: l.cantidad })),
       ...ordenes
         .filter((o) => o.estado === 'listo')
-        .map((o) => ({ productoId: o.productoId, cantidad: o.cantidad })),
+        .map((o) => ({ productoId: o.productoId, bobinaId: o.colorBobinaId, cantidad: o.cantidad })),
     ]
     for (const d of devolver) {
-      await tx
-        .update(productos)
-        .set({ stock: sql`${productos.stock} + ${d.cantidad}`, actualizadoEn: new Date() })
-        .where(eq(productos.id, d.productoId))
-      await tx.insert(movimientosStock).values({
-        productoId: d.productoId,
+      await moverStock(tx, {
+        ...d,
         tipo: 'ajuste',
-        cantidad: d.cantidad,
         nota: `Vuelve al stock: se canceló el pedido ${p.codigo}`,
         pedidoId: p.id,
         usuarioId: u.id,

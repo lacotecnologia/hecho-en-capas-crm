@@ -79,6 +79,24 @@ export const ESTADOS_INFO: Record<
 
 export type TipoProducto = 'catalogo' | 'personalizado'
 
+/** Un color preaprobado de un producto: una bobina del taller y su stock. */
+export type ColorProducto = {
+  bobinaId: number
+  /** Nombre del color, ej. "Azul". */
+  color: string
+  colorHex: string
+  material: string
+  /** Unidades ya impresas de este color. */
+  stock: number
+  /** La bobina sigue activa en el taller. */
+  activa: boolean
+}
+
+/** "Azul (PLA Matte)" — el nombre que se muestra en listas. */
+export function nombreColor(c: Pick<ColorProducto, 'color' | 'material'>) {
+  return c.material ? `${c.color} (${c.material})` : c.color
+}
+
 /** Lo que ve cualquier persona del equipo (incluido el comercial). */
 export type ProductoResumen = {
   id: number
@@ -89,8 +107,13 @@ export type ProductoResumen = {
   tipo: TipoProducto
   estado: EstadoProducto
   multicolor: boolean
+  /** El comercial escoge el color entre `colores` al cotizar. */
+  escogeColor: boolean
+  /** Colores preaprobados (vacío si no escoge color). */
+  colores: ColorProducto[]
   precioFabrica: number
   diasFabricacion: number
+  /** Total de unidades impresas (suma de todos los colores). */
   stock: number
   portada: string | null
   actualizadoEn: string
@@ -276,6 +299,9 @@ export type ProductoEntrada = {
   tipo: TipoProducto
   estado: EstadoProducto
   multicolor: boolean
+  escogeColor: boolean
+  /** Bobinas preaprobadas (en orden). Vacío si no escoge color. */
+  colores: number[]
   diasFabricacion: number
   impresoraId: number | null
   bobinaId: number | null
@@ -341,6 +367,23 @@ export function validarProducto(
 
   const v = (k: keyof typeof chequeos) => (chequeos[k] as { datos: number | null }).datos
 
+  const escogeColor = Boolean(c.escogeColor)
+  const colores = escogeColor
+    ? [
+        ...new Set(
+          (Array.isArray(c.colores) ? c.colores : [])
+            .map((x) => idOpcional(x))
+            .filter((x): x is number => x !== null)
+        ),
+      ].slice(0, 30)
+    : []
+  if (escogeColor && colores.length < 2) {
+    return malo(
+      'Marca al menos 2 colores para que el comercial pueda escoger. Si se vende en un solo color, apaga "El cliente puede escoger el color".',
+      'colores'
+    )
+  }
+
   return {
     ok: true,
     datos: {
@@ -350,6 +393,8 @@ export function validarProducto(
       tipo,
       estado,
       multicolor: Boolean(c.multicolor),
+      escogeColor,
+      colores,
       diasFabricacion: v('diasFabricacion')!,
       impresoraId: idOpcional(c.impresoraId),
       bobinaId: idOpcional(c.bobinaId),
@@ -430,4 +475,68 @@ export function validarPrecio(
 
 export function skuDe(id: number) {
   return `HC-${String(id).padStart(4, '0')}`
+}
+
+/**
+ * Qué pasa con los colores al guardar la ficha. Reglas:
+ * - No se puede quitar un color que todavía tiene unidades en stock.
+ * - Al prender los colores, lo que ya había en stock queda en el color de la
+ *   bobina de referencia (o en el primero) y luego se reparte con "Ajustar stock".
+ * - Al apagarlos, el stock total se conserva sin color.
+ */
+export function planColores(
+  antes: {
+    escogeColor: boolean
+    colores: Pick<ColorProducto, 'bobinaId' | 'color' | 'material' | 'stock'>[]
+    stock: number
+  },
+  ahora: { escogeColor: boolean; colores: number[]; bobinaId: number | null }
+): Resultado<{ quitar: number[]; agregar: number[]; stockA: number | null }> {
+  const previos = antes.escogeColor ? antes.colores : []
+  if (!ahora.escogeColor) {
+    return { ok: true, datos: { quitar: previos.map((c) => c.bobinaId), agregar: [], stockA: null } }
+  }
+  const quitar = previos.filter((c) => !ahora.colores.includes(c.bobinaId))
+  const conStock = quitar.find((c) => c.stock > 0)
+  if (conStock) {
+    return malo(
+      `El color ${nombreColor(conStock)} tiene ${conStock.stock} en stock. Sácalos con "Ajustar stock" antes de quitar ese color.`,
+      'colores'
+    )
+  }
+  const agregar = ahora.colores.filter((id) => !previos.some((c) => c.bobinaId === id))
+  const stockA =
+    !antes.escogeColor && antes.stock > 0
+      ? ahora.bobinaId && ahora.colores.includes(ahora.bobinaId)
+        ? ahora.bobinaId
+        : ahora.colores[0]
+      : null
+  return { ok: true, datos: { quitar: quitar.map((c) => c.bobinaId), agregar, stockA } }
+}
+
+/** Revisa un ajuste de stock (entra o sale) del producto y, si aplica, del color. */
+export function validarAjusteStock(
+  producto: { escogeColor: boolean; stock: number; colores: Pick<ColorProducto, 'bobinaId' | 'color' | 'material' | 'stock'>[] },
+  cuerpo: Record<string, unknown>
+): Resultado<{ cantidad: number; nota: string; bobinaId: number | null }> {
+  const cantidad = Number(cuerpo.cantidad)
+  const nota = String(cuerpo.nota ?? '').trim().slice(0, 200)
+  if (!Number.isInteger(cantidad) || cantidad === 0 || Math.abs(cantidad) > 10_000) {
+    return malo('Escribe cuántas unidades entran (ej. 10) o salen (ej. -2).', 'cantidad')
+  }
+  if (!producto.escogeColor) {
+    if (producto.stock + cantidad < 0) {
+      return malo(`No puedes sacar ${Math.abs(cantidad)}: solo hay ${producto.stock} en stock.`, 'cantidad')
+    }
+    return { ok: true, datos: { cantidad, nota, bobinaId: null } }
+  }
+  const color = producto.colores.find((c) => c.bobinaId === Number(cuerpo.bobinaId))
+  if (!color) return malo('Escoge de qué color son las unidades.', 'bobinaId')
+  if (color.stock + cantidad < 0) {
+    return malo(
+      `No puedes sacar ${Math.abs(cantidad)} de ${nombreColor(color)}: solo hay ${color.stock}.`,
+      'cantidad'
+    )
+  }
+  return { ok: true, datos: { cantidad, nota, bobinaId: color.bobinaId } }
 }

@@ -115,6 +115,8 @@ const s = StyleSheet.create({
   colUnit: { width: 80, textAlign: 'right' },
   colTotal: { width: 86, textAlign: 'right' },
   desc: { fontSize: 8, color: SUAVE, marginTop: 1 },
+  color: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, fontSize: 8.5 },
+  puntoColor: { width: 7, height: 7, borderRadius: 3.5, borderWidth: 0.5, borderColor: '#00000033' },
   totales: { alignSelf: 'flex-end', width: 236, marginTop: 10 },
   totalFila: {
     flexDirection: 'row',
@@ -291,6 +293,14 @@ function Documento({
               ) : null}
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: 'Helvetica-Bold' }}>{l.nombre}</Text>
+                {l.color ? (
+                  <View style={s.color}>
+                    <View
+                      style={[s.puntoColor, { backgroundColor: l.colorHex || '#999999' }]}
+                    />
+                    <Text>Color: {l.color}</Text>
+                  </View>
+                ) : null}
                 {l.descripcion ? (
                   <Text style={s.desc}>{l.descripcion}</Text>
                 ) : null}

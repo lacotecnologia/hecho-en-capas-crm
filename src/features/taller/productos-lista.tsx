@@ -9,6 +9,7 @@ import {
 import { Box, Plus, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { PuntosColores } from '@/components/color'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -172,6 +173,7 @@ export function ProductosLista({ puedeEditar }: { puedeEditar: boolean }) {
                   {p.categoria && ` · ${p.categoria}`}
                   {p.tipo === 'personalizado' && ' · Personalizado'}
                 </p>
+                {p.escogeColor && <PuntosColores colores={p.colores} />}
                 <div className='flex flex-wrap items-center justify-between gap-2'>
                   <EstadoProductoBadge estado={p.estado} />
                   <span className='text-sm text-muted-foreground tabular-nums'>

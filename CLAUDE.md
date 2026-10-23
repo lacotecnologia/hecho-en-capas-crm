@@ -32,6 +32,7 @@ Sistema interno (familiar) para cotizaciones, pedidos, taller, cobros y entregas
 - Sin IVA. Anticipo 50 % solo en personalizados. Cotización vence a los 10 días.
 - Precio de fábrica = costo × (1 + margen elegido 40 % o 50 %), redondeado hacia arriba al mil; el taller puede subirlo a mano, también en miles (se guarda el calculado y el ajuste).
 - El comercial puede subir hasta 25 % sobre el precio de fábrica, en valores redondos a mil (el máximo es el mil más alto que no pasa el 25 %); esa diferencia es su ganancia. Nunca por debajo del precio de fábrica.
+- Colores por producto: si el taller prende "El cliente puede escoger el color", marca bobinas preaprobadas (mínimo 2); el comercial escoge una por línea (mismo precio). Stock por color (`producto_colores`, el total en `productos.stock`); todo movimiento pasa por `moverStock` en `server/stock.ts`. La orden guarda `color_bobina_id` y al empezar solo se acepta una bobina de ese color y material.
 - Impresoras: Bambu Lab A1 con AMS lite (multicolor, 3.200.000 COP) y Anycubic Kobra 2 Neo (un color, 800.000 COP).
 
 ## Verificar antes de subir

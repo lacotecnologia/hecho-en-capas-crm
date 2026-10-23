@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { type ProductoResumen } from '@shared/taller'
 import { Box, Check, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { PuntosColores } from '@/components/color'
 import {
   Dialog,
   DialogContent,
@@ -105,6 +106,7 @@ export function SelectorProducto({
                     {p.sku}
                     {p.stock > 0 && ` · ${p.stock} en stock`}
                   </p>
+                  {p.escogeColor && <PuntosColores colores={p.colores} />}
                   <p className='text-sm font-semibold tabular-nums'>
                     {formatoPesos(p.precioFabrica)}
                     <span className='ms-1 text-xs font-normal text-muted-foreground'>

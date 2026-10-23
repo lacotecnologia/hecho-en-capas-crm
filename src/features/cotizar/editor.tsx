@@ -52,6 +52,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Campo, CampoNumero } from '@/components/campo'
+import { BotonesColor } from '@/components/color'
 import { Pagina } from '@/components/layout/pagina'
 import { consultaConfiguracion } from '@/features/configuracion/api'
 import { consultaProductos } from '@/features/taller/api'
@@ -78,6 +79,8 @@ type LineaForm = {
   diasFabricacion: number
   cantidad: string
   precioVenta: string
+  /** Color escogido (solo en productos con colores). */
+  bobinaId: number | null
 }
 
 type CargoForm = { concepto: string; valor: string }
@@ -117,6 +120,7 @@ export function EditorCotizacion({
         diasFabricacion: l.diasFabricacion,
         cantidad: String(l.cantidad),
         precioVenta: String(l.precioVenta),
+        bobinaId: l.bobinaId,
       })) ?? []
   )
   const [cargos, setCargos] = useState<CargoForm[]>(
@@ -152,9 +156,17 @@ export function EditorCotizacion({
     [catalogo]
   )
 
+  /** Stock del producto, o del color escogido si el producto tiene colores. */
+  const stockDe = (l: Pick<LineaForm, 'productoId' | 'bobinaId'>) => {
+    const p = enCatalogo.get(l.productoId)
+    if (!p) return 0
+    if (!p.escogeColor) return p.stock
+    return p.colores.find((c) => c.bobinaId === l.bobinaId)?.stock ?? 0
+  }
+
   const lineasCalc = lineas.map((l) => {
     const cantidad = Number(l.cantidad) || 0
-    const stock = enCatalogo.get(l.productoId)?.stock ?? 0
+    const stock = stockDe(l)
     return {
       cantidad,
       precioFabrica: l.precioFabrica,
@@ -188,6 +200,7 @@ export function EditorCotizacion({
       productoId: l.productoId,
       cantidad: Number(l.cantidad) || 0,
       precioVenta: Number(l.precioVenta) || 0,
+      bobinaId: l.bobinaId,
     })),
     cargos: cargosCalc.filter((c) => c.concepto.trim() || c.valor),
     descuento: Number(descuento) || 0,
@@ -246,7 +259,20 @@ export function EditorCotizacion({
 
   const agregarProducto = (p: ProductoResumen) => {
     setEligiendo(false)
-    if (lineas.some((l) => l.productoId === p.id)) {
+    const iguales = lineas.filter((l) => l.productoId === p.id)
+    if (p.escogeColor) {
+      // Con colores, el mismo producto puede ir otra vez en otro color
+      if (iguales.some((l) => !l.bobinaId)) {
+        toast.info(
+          `Primero escoge el color de “${p.nombre}” que ya agregaste.`
+        )
+        return
+      }
+      if (iguales.length >= p.colores.length) {
+        toast.info(`“${p.nombre}” ya está en todos sus colores.`)
+        return
+      }
+    } else if (iguales.length > 0) {
       toast.info(
         `“${p.nombre}” ya está en la cotización. Cambia la cantidad si necesitas más.`
       )
@@ -264,6 +290,7 @@ export function EditorCotizacion({
         diasFabricacion: p.diasFabricacion,
         cantidad: '1',
         precioVenta: String(precioMaximoComercial(p.precioFabrica, tope)),
+        bobinaId: null,
       },
     ])
   }
@@ -336,10 +363,16 @@ export function EditorCotizacion({
                   precio > 0 &&
                   precio !== l.precioFabrica &&
                   !esPrecioRedondo(precio)
-                const stock = enCatalogo.get(l.productoId)?.stock ?? 0
+                const stock = stockDe(l)
+                const producto = enCatalogo.get(l.productoId)
+                const conColor = !!producto?.escogeColor
+                // Colores que ya usa otra línea del mismo producto
+                const usados = lineas
+                  .filter((x, j) => j !== i && x.productoId === l.productoId)
+                  .map((x) => x.bobinaId)
                 return (
                   <div
-                    key={l.productoId}
+                    key={`${l.productoId}-${l.bobinaId ?? 'sin'}-${i}`}
                     className='grid gap-3 rounded-xl border p-3 sm:grid-cols-[64px_1fr]'
                   >
                     <div className='hidden size-16 overflow-hidden rounded-lg bg-muted sm:block'>
@@ -377,6 +410,34 @@ export function EditorCotizacion({
                           <Trash2 />
                         </Button>
                       </div>
+                      {conColor && (
+                        <div className='grid gap-1.5'>
+                          <span className='text-sm font-medium'>
+                            Color{' '}
+                            {!l.bobinaId && (
+                              <span className='font-normal text-marca-naranja'>
+                                · falta escogerlo
+                              </span>
+                            )}
+                          </span>
+                          <BotonesColor
+                            etiqueta={`Color de ${l.nombre}`}
+                            opciones={producto!.colores.map((c) => ({
+                              bobinaId: c.bobinaId,
+                              color: c.color,
+                              colorHex: c.colorHex,
+                              detalle:
+                                c.stock > 0 ? `${c.stock} en stock` : 'Se imprime',
+                              deshabilitado: usados.includes(c.bobinaId),
+                            }))}
+                            seleccion={l.bobinaId ? [l.bobinaId] : []}
+                            onChange={([id]) =>
+                              cambiarLinea(i, { bobinaId: id ?? null })
+                            }
+                            invalido={!l.bobinaId && errorDe('lineas') !== undefined}
+                          />
+                        </div>
+                      )}
                       <div className='grid gap-3 sm:grid-cols-[110px_1fr]'>
                         <CampoNumero
                           etiqueta='Cantidad'
@@ -770,7 +831,9 @@ export function EditorCotizacion({
         abierto={eligiendo}
         onCerrar={() => setEligiendo(false)}
         onElegir={agregarProducto}
-        yaAgregados={lineas.map((l) => l.productoId)}
+        yaAgregados={lineas
+          .filter((l) => !enCatalogo.get(l.productoId)?.escogeColor)
+          .map((l) => l.productoId)}
       />
       <DialogoPersonalizado
         abierto={pidiendo}

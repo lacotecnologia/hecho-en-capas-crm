@@ -95,10 +95,14 @@ export const accionOrden = (
   body?: unknown
 ) => api<RespuestaOrden>(`/cola/${id}/${accion}`, { method: 'POST', body })
 
-export const ordenParaStock = (productoId: number, cantidad: number) =>
+export const ordenParaStock = (
+  productoId: number,
+  cantidad: number,
+  bobinaId: number | null = null
+) =>
   api<RespuestaOrden>('/cola/stock', {
     method: 'POST',
-    body: { productoId, cantidad },
+    body: { productoId, cantidad, bobinaId },
   })
 
 export const quitarOrden = (id: number) =>

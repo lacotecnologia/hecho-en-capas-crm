@@ -90,8 +90,13 @@ export type LineaCotizacion = {
   precioVenta: number
   personalizado: boolean
   diasFabricacion: number
-  /** Hay stock suficiente: no hay que imprimir. */
+  /** Hay stock suficiente (del color escogido): no hay que imprimir. */
   desdeStock: boolean
+  /** Color escogido (bobina preaprobada); null si el producto no escoge color. */
+  bobinaId: number | null
+  /** Nombre del color, ej. "Azul" ('' si no aplica). */
+  color: string
+  colorHex: string
 }
 
 export type Cargo = { concepto: string; valor: number }
@@ -242,7 +247,7 @@ export function validarCliente(c: Record<string, unknown>): Resultado<ClienteEnt
 export type CotizacionEntrada = {
   clienteId: number | null
   modalidad: Modalidad
-  lineas: { productoId: number; cantidad: number; precioVenta: number }[]
+  lineas: { productoId: number; cantidad: number; precioVenta: number; bobinaId: number | null }[]
   cargos: Cargo[]
   descuento: number
   notas: string
@@ -264,6 +269,7 @@ export function leerEntradaCotizacion(
     productoId: entero(l?.productoId),
     cantidad: entero(l?.cantidad),
     precioVenta: entero(l?.precioVenta),
+    bobinaId: entero(l?.bobinaId) > 0 ? entero(l?.bobinaId) : null,
   }))
   for (const l of lineas) {
     if (!(l.cantidad >= 1 && l.cantidad <= 100_000)) {
@@ -304,6 +310,50 @@ type ProductoParaCotizar = {
   nombre: string
   estado: string
   precioFabrica: number
+}
+
+/** Lo que hace falta saber de cada producto para revisar los colores. */
+export type ColoresParaCotizar = {
+  nombre: string
+  escogeColor: boolean
+  colores: { bobinaId: number; color: string; colorHex: string }[]
+}
+
+/**
+ * Cada línea de un producto con colores debe traer uno de sus colores
+ * preaprobados; las demás no llevan color. Un mismo producto puede ir
+ * varias veces si es en colores distintos.
+ */
+export function validarColoresCotizacion(
+  lineas: { productoId: number; bobinaId: number | null }[],
+  productos: Map<number, ColoresParaCotizar>
+): Resultado<true> {
+  const vistas = new Set<string>()
+  for (const l of lineas) {
+    const p = productos.get(l.productoId)
+    if (!p) continue
+    if (p.escogeColor) {
+      if (!l.bobinaId) {
+        return malo(`Escoge el color de "${p.nombre}".`, 'lineas')
+      }
+      if (!p.colores.some((c) => c.bobinaId === l.bobinaId)) {
+        return malo(
+          `Ese color ya no está disponible para "${p.nombre}". Escoge otro de la lista.`,
+          'lineas'
+        )
+      }
+    }
+    const clave = `${l.productoId}-${p.escogeColor ? l.bobinaId : 0}`
+    if (vistas.has(clave)) {
+      const color = p.colores.find((c) => c.bobinaId === l.bobinaId)?.color
+      return malo(
+        `"${p.nombre}"${color ? ` en ${color}` : ''} está dos veces. Súmalas en una sola línea.`,
+        'lineas'
+      )
+    }
+    vistas.add(clave)
+  }
+  return { ok: true, datos: true }
 }
 
 /** Reglas de precio por línea y del descuento. */

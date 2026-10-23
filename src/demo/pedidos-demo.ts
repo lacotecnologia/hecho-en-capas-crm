@@ -40,6 +40,7 @@ import {
   sumarHoras,
   tipoDePago,
   type TipoPago,
+  validarBobinaParaColor,
   validarFalla,
   validarImpresoraParaOrden,
   validarMotivoCancelacion,
@@ -62,7 +63,12 @@ import {
 } from '@shared/seguimiento'
 import { ApiError } from '@/lib/api'
 import { type CotizarDemo } from './cotizar-demo'
-import { portadaDe, type TallerDemo } from './taller-demo'
+import {
+  moverStockDemo,
+  portadaDe,
+  stockDisponibleDemo,
+  type TallerDemo,
+} from './taller-demo'
 
 type LineaDemo = Omit<LineaPedido, 'estado'>
 
@@ -102,6 +108,8 @@ type OrdenDemo = {
   pedidoId: number | null
   lineaId: number | null
   productoId: number
+  /** Color que pidió el cliente (o el del stock). */
+  colorBobinaId?: number | null
   cantidad: number
   estado: EstadoOrden
   impresoraId: number | null
@@ -792,10 +800,13 @@ export function atenderPedidos(
         ...d.pedidos.flatMap((x) => x.lineas.map((l) => l.id))
       )
       const lineas: LineaDemo[] = cotizacion.lineas.map((l) => {
-        const prod = taller.productos.find((x) => x.id === l.productoId)
         const desdeStock =
-          !l.personalizado && !!prod && prod.stock >= l.cantidad
-        if (desdeStock) prod!.stock -= l.cantidad
+          !l.personalizado &&
+          stockDisponibleDemo(taller, l.productoId, l.bobinaId ?? null) >=
+            l.cantidad
+        if (desdeStock) {
+          moverStockDemo(taller, l.productoId, l.bobinaId ?? null, -l.cantidad)
+        }
         return {
           id: ++lineaId,
           productoId: l.productoId,
@@ -807,6 +818,9 @@ export function atenderPedidos(
           precioVenta: l.precioVenta,
           personalizado: l.personalizado,
           desdeStock,
+          bobinaId: l.bobinaId ?? null,
+          color: l.color ?? '',
+          colorHex: l.colorHex ?? '',
         }
       })
       const p: PedidoDemo = {
@@ -851,6 +865,7 @@ export function atenderPedidos(
           pedidoId: id,
           lineaId: l.id,
           productoId: l.productoId,
+          colorBobinaId: l.bobinaId,
           cantidad: l.cantidad,
           estado:
             l.personalizado && requiereAnticipo ? 'espera_anticipo' : 'en_cola',
@@ -947,12 +962,15 @@ export function atenderPedidos(
         )
       }
       const devolver = [
-        ...p.lineas.filter((l) => l.desdeStock),
-        ...ordenes.filter((o) => o.estado === 'listo'),
+        ...p.lineas
+          .filter((l) => l.desdeStock)
+          .map((l) => ({ ...l, bobinaId: l.bobinaId ?? null })),
+        ...ordenes
+          .filter((o) => o.estado === 'listo')
+          .map((o) => ({ ...o, bobinaId: o.colorBobinaId ?? null })),
       ]
       for (const x of devolver) {
-        const prod = taller.productos.find((y) => y.id === x.productoId)
-        if (prod) prod.stock += x.cantidad
+        moverStockDemo(taller, x.productoId, x.bobinaId, x.cantidad)
       }
       for (const o of ordenes.filter((x) => x.estado !== 'listo'))
         o.estado = 'cancelada'
@@ -1306,6 +1324,9 @@ export function atenderPedidos(
     const prod = taller.productos.find((x) => x.id === o.productoId)!
     const p = d.pedidos.find((x) => x.id === o.pedidoId)
     const est = estimarOrden(prod.horas, prod.unidadesPorCama, o.cantidad)
+    const color = o.colorBobinaId
+      ? taller.bobinas.find((b) => b.id === o.colorBobinaId)
+      : undefined
     return {
       id: o.id,
       estado: o.estado,
@@ -1316,9 +1337,17 @@ export function atenderPedidos(
         imagen: portadaDe(taller, prod.id),
         multicolor: prod.multicolor,
         impresoraSugeridaId: prod.impresoraId,
-        bobinaSugeridaId: prod.bobinaId,
+        bobinaSugeridaId: color?.id ?? prod.bobinaId,
       },
       cantidad: o.cantidad,
+      color: color
+        ? {
+            bobinaId: color.id,
+            color: color.color,
+            colorHex: color.colorHex,
+            material: color.material,
+          }
+        : null,
       horas: est.horas,
       camas: est.camas,
       pedido: p
@@ -1388,11 +1417,20 @@ export function atenderPedidos(
         'productoId'
       )
     }
+    let colorBobinaId: number | null = null
+    if (prod.escogeColor) {
+      const elegido = prod.coloresStock.find(
+        (x) => x.bobinaId === Number(c.bobinaId)
+      )
+      if (!elegido) fallo(400, 'Escoge de qué color vas a imprimir.', 'bobinaId')
+      colorBobinaId = elegido!.bobinaId
+    }
     const o: OrdenDemo = {
       id: sig(d.ordenes),
       pedidoId: null,
       lineaId: null,
       productoId: prod.id,
+      colorBobinaId,
       cantidad,
       estado: 'en_cola',
       impresoraId: null,
@@ -1473,6 +1511,12 @@ export function atenderPedidos(
           'impresoraId'
         )
       }
+      if (o.colorBobinaId) {
+        const pedida = taller.bobinas.find((b) => b.id === o.colorBobinaId)
+        const elegida = taller.bobinas.find((b) => b.id === Number(c.bobinaId))
+        const vc = validarBobinaParaColor(pedida ?? null, elegida ?? null)
+        if (!vc.ok) fallo(400, vc.mensaje, vc.campo)
+      }
       const inicio = new Date()
       const est = estimarOrden(prod.horas, prod.unidadesPorCama, o.cantidad)
       Object.assign(o, {
@@ -1502,7 +1546,9 @@ export function atenderPedidos(
       nota = `Falló: ${v.datos.motivo}`
     } else if (accion === 'listo') {
       o.estado = 'listo'
-      if (!o.pedidoId) prod.stock += o.cantidad
+      if (!o.pedidoId) {
+        moverStockDemo(taller, prod.id, o.colorBobinaId ?? null, o.cantidad)
+      }
     } else {
       Object.assign(o, {
         estado: 'en_cola',

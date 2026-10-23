@@ -34,6 +34,7 @@ import { tieneRol, useSesion } from '@/lib/sesion'
 import { subirFoto } from '@/lib/subir-foto'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { EtiquetaColor } from '@/components/color'
 import {
   Card,
   CardContent,
@@ -296,7 +297,10 @@ function Ficha({ p }: { p: PedidoDetalle }) {
                     )}
                   </div>
                   <div className='min-w-40 flex-1'>
-                    <p className='font-medium'>{l.nombre}</p>
+                    <p className='flex flex-wrap items-center gap-2 font-medium'>
+                      {l.nombre}
+                      <EtiquetaColor color={l.color} colorHex={l.colorHex} />
+                    </p>
                     <p className='text-sm text-muted-foreground'>
                       {l.cantidad} {l.cantidad === 1 ? 'unidad' : 'unidades'}
                       {l.personalizado && ' · personalizado'}

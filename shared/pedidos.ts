@@ -106,6 +106,10 @@ export type LineaPedido = {
   desdeStock: boolean
   /** Estado de su orden (o "listo" si salió del stock). */
   estado: EstadoOrden
+  /** Color escogido por el cliente (null si el producto no escoge color). */
+  bobinaId: number | null
+  color: string
+  colorHex: string
 }
 
 export type Pago = {
@@ -191,6 +195,8 @@ export type OrdenCola = {
     bobinaSugeridaId: number | null
   }
   cantidad: number
+  /** Color que hay que imprimir (lo pidió el cliente o es para stock de ese color). */
+  color: { bobinaId: number; color: string; colorHex: string; material: string } | null
   /** Horas estimadas para toda la orden. */
   horas: number
   camas: number
@@ -360,4 +366,27 @@ export function validarNota(c: Record<string, unknown>): { ok: true; nota: strin
   const nota = String(c.nota ?? '').trim().slice(0, 500)
   if (nota.length < 2) return malo('Escribe la nota.', 'nota')
   return { ok: true, nota, visibleCliente: c.visibleCliente === true }
+}
+
+/**
+ * Si la orden pide un color, la bobina que carga el taller debe ser de ese
+ * mismo color y material (puede ser otro rollo igual).
+ */
+export function validarBobinaParaColor(
+  pedido: { color: string; material: string } | null,
+  elegida: { color: string; material: string } | null
+): { ok: true } | { ok: false; mensaje: string; campo: string } {
+  if (!pedido) return { ok: true }
+  const igual = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+  if (!elegida) {
+    return { ok: false, mensaje: `Esta orden es en ${pedido.color}: escoge la bobina que vas a usar.`, campo: 'bobinaId' }
+  }
+  if (!igual(pedido.color, elegida.color) || !igual(pedido.material, elegida.material)) {
+    return {
+      ok: false,
+      mensaje: `Esta orden es en ${pedido.color} (${pedido.material}). Carga una bobina de ese color, no ${elegida.color} (${elegida.material}).`,
+      campo: 'bobinaId',
+    }
+  }
+  return { ok: true }
 }

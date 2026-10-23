@@ -51,7 +51,7 @@ type EstadoDemo = {
   pedidos: PedidosDemo
 }
 
-const CLAVE = 'hec-demo-v7'
+const CLAVE = 'hec-demo-v8'
 const MAX_INTENTOS = 5
 const MINUTOS_BLOQUEO = 15
 
@@ -135,7 +135,9 @@ function ejemploCotizacion(estado: EstadoDemo) {
     const otra = como(2, '/cotizaciones', {
       clienteId: cliente,
       modalidad: 'nacional',
-      lineas: [{ productoId: 1, cantidad: 24, precioVenta: precio(1) }],
+      lineas: [
+        { productoId: 1, cantidad: 24, precioVenta: precio(1), bobinaId: 4 },
+      ],
       cargos: [{ concepto: 'Envío', valor: 15000 }],
       notas: 'Llaveros para el evento de aniversario.',
     }).cotizacion
@@ -147,7 +149,7 @@ function ejemploCotizacion(estado: EstadoDemo) {
     }
     const orden = cola.ordenes.find((o) => o.pedido?.id === pedido.id)
     if (orden)
-      como(3, `/cola/${orden.id}/empezar`, { impresoraId: 1, bobinaId: 1 })
+      como(3, `/cola/${orden.id}/empezar`, { impresoraId: 1, bobinaId: 4 })
     // 3) Pedido que salió del stock: listo para programar la entrega
     const deStock = como(2, '/cotizaciones', {
       clienteId: 1,

@@ -12,6 +12,7 @@ import {
   ESTADOS_INFO,
   ESTADOS_PRODUCTO,
   type EstadoProducto,
+  nombreColor,
   type ProductoDetalle,
   type TipoProducto,
 } from '@shared/taller'
@@ -58,8 +59,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Campo, CampoNumero } from '@/components/campo'
+import { BotonesColor, EtiquetaColor } from '@/components/color'
 import { Pagina } from '@/components/layout/pagina'
 import { consultaConfiguracion } from '@/features/configuracion/api'
 import {
@@ -142,6 +145,8 @@ type Formulario = {
   tipo: TipoProducto
   estado: EstadoProducto
   multicolor: boolean
+  escogeColor: boolean
+  colores: number[]
   diasFabricacion: string
   impresoraId: string
   bobinaId: string
@@ -174,6 +179,8 @@ function formularioDe(
     tipo: p?.tipo ?? 'catalogo',
     estado: p?.estado ?? 'costeo',
     multicolor: p?.multicolor ?? false,
+    escogeColor: p?.escogeColor ?? false,
+    colores: p?.colores.map((c) => c.bobinaId) ?? [],
     diasFabricacion: String(p?.diasFabricacion ?? 2),
     impresoraId: c?.impresoraId ? String(c.impresoraId) : '',
     bobinaId: c?.bobinaId ? String(c.bobinaId) : '',
@@ -263,6 +270,8 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
         tipo: f.tipo,
         estado: f.estado,
         multicolor: f.multicolor,
+        escogeColor: f.escogeColor,
+        colores: f.colores,
         diasFabricacion: f.diasFabricacion,
         impresoraId: f.impresoraId || null,
         bobinaId: f.bobinaId || null,
@@ -564,6 +573,28 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
               />
             </CardContent>
           </Card>
+
+          {/* ---------- Colores para vender ---------- */}
+          <TarjetaColores
+            producto={producto}
+            bobinas={bobinas}
+            escogeColor={f.escogeColor}
+            colores={f.colores}
+            bobinaReferencia={f.bobinaId ? Number(f.bobinaId) : null}
+            onEscoge={(v) =>
+              setF((p) => ({
+                ...p,
+                escogeColor: v,
+                // Al prenderlo, arranca con la bobina de referencia marcada
+                colores:
+                  v && p.colores.length === 0 && p.bobinaId
+                    ? [Number(p.bobinaId)]
+                    : p.colores,
+              }))
+            }
+            onColores={set('colores')}
+            error={errorDe('colores')}
+          />
 
           {/* ---------- Trabajo a mano ---------- */}
           <Card>
@@ -972,6 +1003,123 @@ function SeccionArchivos({ producto }: { producto: ProductoDetalle | null }) {
 }
 
 // ============================================================
+// Colores para vender
+// ============================================================
+
+function TarjetaColores({
+  producto,
+  bobinas,
+  escogeColor,
+  colores,
+  bobinaReferencia,
+  onEscoge,
+  onColores,
+  error,
+}: {
+  producto: ProductoDetalle | null
+  bobinas: {
+    id: number
+    color: string
+    colorHex: string
+    material: string
+    serial: string
+    activa: boolean
+  }[]
+  escogeColor: boolean
+  colores: number[]
+  bobinaReferencia: number | null
+  onEscoge: (v: boolean) => void
+  onColores: (ids: number[]) => void
+  error?: string
+}) {
+  const stockDe = new Map(producto?.colores.map((c) => [c.bobinaId, c.stock]))
+  const opciones = bobinas
+    .filter((b) => b.activa || colores.includes(b.id))
+    .map((b) => {
+      const stock = stockDe.get(b.id) ?? 0
+      return {
+        bobinaId: b.id,
+        color: b.color,
+        colorHex: b.colorHex,
+        detalle: [b.material, b.serial, stock > 0 && `${stock} en stock`]
+          .filter(Boolean)
+          .join(' · '),
+      }
+    })
+  // Lo que ya había impreso, al prender los colores, queda en este color
+  const sinColor = producto && !producto.escogeColor ? producto.stock : 0
+  const destino =
+    bobinaReferencia && colores.includes(bobinaReferencia)
+      ? bobinaReferencia
+      : colores[0]
+  const nombreDestino = bobinas.find((b) => b.id === destino)?.color
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className='text-lg'>Colores para vender</CardTitle>
+        <CardDescription>
+          Si este producto se hace en varios colores, el comercial escoge uno al
+          cotizar. El precio es el mismo en todos.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className='grid gap-4'>
+        <label className='flex items-start gap-3'>
+          <Switch
+            checked={escogeColor}
+            onCheckedChange={onEscoge}
+            className='mt-0.5'
+          />
+          <span className='grid gap-0.5'>
+            <span className='font-medium'>El cliente puede escoger el color</span>
+            <span className='text-sm text-muted-foreground'>
+              {escogeColor
+                ? 'Marca solo los colores que se venden en este modelo.'
+                : 'Apagado: siempre se hace con la bobina de arriba.'}
+            </span>
+          </span>
+        </label>
+        {escogeColor && (
+          <div className='grid gap-2'>
+            <span className='text-sm font-medium'>
+              Colores preaprobados ({colores.length})
+            </span>
+            {opciones.length === 0 ? (
+              <p className='text-sm text-muted-foreground'>
+                Primero agrega bobinas en la pestaña Bobinas.
+              </p>
+            ) : (
+              <BotonesColor
+                multiple
+                etiqueta='Colores preaprobados'
+                opciones={opciones}
+                seleccion={colores}
+                onChange={onColores}
+                invalido={!!error}
+              />
+            )}
+            {error ? (
+              <p className='text-sm font-medium text-destructive'>{error}</p>
+            ) : (
+              <p className='text-sm text-muted-foreground'>
+                Mínimo 2. Las demás bobinas del taller no le aparecen al comercial.
+              </p>
+            )}
+            {sinColor > 0 && nombreDestino && (
+              <p className='rounded-lg bg-marca-amarillo/20 p-3 text-sm'>
+                Las {sinColor} unidades que ya hay en stock quedarán como{' '}
+                <strong>{nombreDestino}</strong>. Si son de otros colores,
+                repártelas después con “Stock”.
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ============================================================
 // Stock
 // ============================================================
 
@@ -981,18 +1129,28 @@ function BotonStock({ producto }: { producto: ProductoDetalle }) {
   const [modo, setModo] = useState<'entra' | 'sale'>('entra')
   const [cantidad, setCantidad] = useState('')
   const [nota, setNota] = useState('')
+  const [color, setColor] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const n = Number(cantidad) || 0
+  const conColor = producto.escogeColor
+  const elegido = producto.colores.find((c) => c.bobinaId === color)
 
   const guardar = useMutation({
     mutationFn: () =>
-      ajustarStock(producto.id, modo === 'entra' ? n : -n, nota),
+      ajustarStock(producto.id, modo === 'entra' ? n : -n, nota, color),
     onSuccess: ({ stock }) => {
       queryClient.invalidateQueries({ queryKey: ['taller'] })
-      toast.success(`Listo. Ahora hay ${stock} en stock.`)
+      toast.success(
+        elegido
+          ? `Listo. Ahora hay ${elegido.stock + (modo === 'entra' ? n : -n)} en ${elegido.color} (${stock} en total).`
+          : `Listo. Ahora hay ${stock} en stock.`
+      )
       setAbierto(false)
       setCantidad('')
       setNota('')
+      setError(null)
     },
+    onError: (e) => setError(mensajeDeError(e)),
   })
 
   return (
@@ -1002,12 +1160,17 @@ function BotonStock({ producto }: { producto: ProductoDetalle }) {
         Stock: <span className='tabular-nums'>{producto.stock}</span>
       </Button>
       <Dialog open={abierto} onOpenChange={setAbierto}>
-        <DialogContent className='sm:max-w-sm'>
+        <DialogContent className='sm:max-w-md'>
           <DialogHeader>
             <DialogTitle>Ajustar stock</DialogTitle>
             <DialogDescription>
               Hoy hay {producto.stock} unidades de {producto.nombre} ya
-              impresas.
+              impresas
+              {conColor && producto.colores.length > 0
+                ? `: ${producto.colores
+                    .map((c) => `${c.stock} ${c.color.toLowerCase()}`)
+                    .join(', ')}.`
+                : '.'}
             </DialogDescription>
           </DialogHeader>
           <div
@@ -1035,6 +1198,22 @@ function BotonStock({ producto }: { producto: ProductoDetalle }) {
               </button>
             ))}
           </div>
+          {conColor && (
+            <div className='grid gap-2'>
+              <span className='text-sm font-medium'>¿De qué color?</span>
+              <BotonesColor
+                etiqueta='Color de las unidades'
+                opciones={producto.colores.map((c) => ({
+                  bobinaId: c.bobinaId,
+                  color: c.color,
+                  colorHex: c.colorHex,
+                  detalle: `${c.stock} en stock`,
+                }))}
+                seleccion={color ? [color] : []}
+                onChange={([id]) => setColor(id ?? null)}
+              />
+            </div>
+          )}
           <CampoNumero
             etiqueta='Cantidad'
             unidad='unid.'
@@ -1051,16 +1230,22 @@ function BotonStock({ producto }: { producto: ProductoDetalle }) {
               />
             )}
           </Campo>
+          {error && (
+            <p className='text-sm font-medium text-destructive' role='alert'>
+              {error}
+            </p>
+          )}
           <DialogFooter>
             <Button variant='outline' onClick={() => setAbierto(false)}>
               Cancelar
             </Button>
             <Button
-              disabled={n <= 0 || guardar.isPending}
+              disabled={n <= 0 || (conColor && !color) || guardar.isPending}
               onClick={() => guardar.mutate()}
             >
               {guardar.isPending && <Loader2 className='animate-spin' />}
               {modo === 'entra' ? `Sumar ${n || ''}` : `Restar ${n || ''}`}
+              {elegido && ` ${elegido.color.toLowerCase()}`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1160,6 +1345,24 @@ function VistaComercial({ producto }: { producto: ProductoDetalle }) {
               <dt className='text-muted-foreground'>Ya impresos en stock</dt>
               <dd className='text-end tabular-nums'>{producto.stock}</dd>
             </dl>
+            {producto.escogeColor && (
+              <div className='grid gap-2'>
+                <p className='text-sm font-medium'>
+                  Colores que puedes ofrecer
+                </p>
+                <ul className='flex flex-wrap gap-2'>
+                  {producto.colores.map((c) => (
+                    <li key={c.bobinaId}>
+                      <EtiquetaColor
+                        color={`${nombreColor(c)} · ${c.stock} en stock`}
+                        colorHex={c.colorHex}
+                        className='text-sm'
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {producto.estado !== 'activo' && (
               <p className='rounded-lg bg-marca-amarillo/20 p-3 text-sm'>
                 {ESTADOS_INFO[producto.estado].explicacion}

@@ -57,10 +57,15 @@ export function guardarProducto(id: number | null, datos: unknown) {
   )
 }
 
-export function ajustarStock(id: number, cantidad: number, nota: string) {
+export function ajustarStock(
+  id: number,
+  cantidad: number,
+  nota: string,
+  bobinaId: number | null = null
+) {
   return api<{ stock: number }>(`/taller/productos/${id}/stock`, {
     method: 'POST',
-    body: { cantidad, nota },
+    body: { cantidad, nota, bobinaId },
   })
 }
 
