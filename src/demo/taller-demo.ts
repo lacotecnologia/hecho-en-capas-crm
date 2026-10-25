@@ -25,9 +25,14 @@ import {
 } from '@shared/taller'
 import { ApiError } from '@/lib/api'
 
-export type ProductoDemo = Omit<ProductoResumen, 'portada' | 'sku' | 'colores'> &
+export type ProductoDemo = Omit<
+  ProductoResumen,
+  'portada' | 'sku' | 'colores' | 'precioTienda' | 'enTienda'
+> &
   ProductoCosto & {
     sku: string
+    precioTienda?: number | null
+    enTienda?: boolean
     /** Colores preaprobados con su stock (solo si escogeColor). */
     coloresStock: { bobinaId: number; stock: number }[]
   }
@@ -357,6 +362,8 @@ function resumen(t: TallerDemo, p: ProductoDemo): ProductoResumen {
     escogeColor: p.escogeColor,
     colores: coloresDemo(t, p),
     precioFabrica: p.precioFabrica,
+    precioTienda: p.precioTienda ?? null,
+    enTienda: p.enTienda ?? false,
     diasFabricacion: p.diasFabricacion,
     stock: p.stock,
     portada: portadaDe(t, p.id),
@@ -469,7 +476,11 @@ export function atenderTaller(
     if (!v.ok) return fallo(400, v.mensaje, v.campo)
     const { colores, ...e } = v.datos
     if (colores.some((id) => !t.bobinas.some((b) => b.id === id))) {
-      fallo(400, 'Uno de los colores ya no existe. Vuelve a marcarlos.', 'colores')
+      fallo(
+        400,
+        'Uno de los colores ya no existe. Vuelve a marcarlos.',
+        'colores'
+      )
     }
     const calc = calcularDemo(t, config, e)
     const imp = t.impresoras.find((i) => i.id === e.impresoraId) ?? null
@@ -525,7 +536,11 @@ export function atenderTaller(
     const p = buscar(r[1])
     const { colores, ...datos } = preparar()
     const plan = planColores(
-      { escogeColor: p.escogeColor, colores: coloresDemo(t, p), stock: p.stock },
+      {
+        escogeColor: p.escogeColor,
+        colores: coloresDemo(t, p),
+        stock: p.stock,
+      },
       { escogeColor: datos.escogeColor, colores, bobinaId: datos.bobinaId }
     )
     if (!plan.ok) return fallo(400, plan.mensaje, plan.campo)
@@ -542,12 +557,37 @@ export function atenderTaller(
     Object.assign(p, datos, { coloresStock })
     return { producto: detalle(t, p, true) }
   }
+  r = m(/^\/taller\/productos\/(\d+)\/tienda$/)
+  if (r && metodo === 'PATCH') {
+    if (!roles.includes('admin')) fallo(403, SIN_PERMISO)
+    const p = buscar(r[1])
+    const precio = c.precioTienda ? Number(c.precioTienda) : null
+    if (precio !== null && precio < p.precioFabrica)
+      return fallo(
+        400,
+        'El precio de la tienda no puede ser menor al precio de fábrica. Sube el valor.',
+        'precioTienda'
+      )
+    if (c.enTienda === true && precio === null)
+      return fallo(
+        400,
+        'Para mostrarlo en la tienda primero escribe su precio al público.',
+        'precioTienda'
+      )
+    p.precioTienda = precio
+    p.enTienda = c.enTienda === true
+    return { producto: detalle(t, p, true) }
+  }
   r = m(/^\/taller\/productos\/(\d+)\/stock$/)
   if (r && metodo === 'POST') {
     deTaller()
     const p = buscar(r[1])
     const v = validarAjusteStock(
-      { escogeColor: p.escogeColor, stock: p.stock, colores: coloresDemo(t, p) },
+      {
+        escogeColor: p.escogeColor,
+        stock: p.stock,
+        colores: coloresDemo(t, p),
+      },
       c
     )
     if (!v.ok) return fallo(400, v.mensaje, v.campo)

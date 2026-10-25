@@ -95,3 +95,13 @@ export function borrarArchivo(id: number, archivoId: number) {
     { method: 'DELETE' }
   )
 }
+
+export function guardarPrecioTienda(
+  id: number,
+  datos: { precioTienda: number | null; enTienda: boolean }
+) {
+  return api<{ producto: ProductoDetalle }>(`/taller/productos/${id}/tienda`, {
+    method: 'PATCH',
+    body: datos,
+  })
+}

@@ -1,9 +1,7 @@
-import { and, asc, desc, eq, inArray, isNull, lt, max, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, lt, max, sql } from 'drizzle-orm'
 import { type Context, Hono } from 'hono'
 import {
-  type Cargo,
   type CotizacionDetalle,
-  type CotizacionEntrada,
   type CotizacionResumen,
   type EstadoCotizacion,
   type LineaCotizacion,
@@ -11,9 +9,7 @@ import {
   calcularCotizacion,
   codigoCotizacion,
   leerEntradaCotizacion,
-  validarColoresCotizacion,
   validarParaEnviar,
-  validarPreciosCotizacion,
 } from '../../shared/cotizacion.js'
 import { skuDe } from '../../shared/taller.js'
 import { getDb } from '../db/index.js'
@@ -24,14 +20,13 @@ import {
   cotizacionLineas,
   cotizaciones,
   pedidos,
-  productoArchivos,
   productos,
   usuarios,
 } from '../db/schema.js'
 import { conSesion, soloRoles, type UsuarioSesion, type Variables } from '../sesion.js'
-import { coloresDe } from '../stock.js'
 import { permisoDeSubida, SOLO_IMAGENES, urlDeBlobValida } from '../subidas.js'
 import { leerConfiguracion } from './configuracion.js'
+import { anioBogota, armar, columnasResumen, guardarHijos } from '../cotizaciones-logica.js'
 
 export const rutasCotizaciones = new Hono<{ Variables: Variables }>()
 
@@ -46,14 +41,6 @@ const SOLO_BORRADOR =
 
 const esAdmin = (u: UsuarioSesion) => u.roles.includes('admin')
 const veGanancia = (u: UsuarioSesion) => esAdmin(u) || u.roles.includes('comercial')
-
-function anioBogota() {
-  return Number(
-    new Intl.DateTimeFormat('en', { timeZone: 'America/Bogota', year: 'numeric' }).format(
-      new Date()
-    )
-  )
-}
 
 /** Las enviadas cuya vigencia pasó quedan vencidas. */
 async function marcarVencidas() {
@@ -152,6 +139,7 @@ async function detalle(cot: FilaCot, u: UsuarioSesion): Promise<CotizacionDetall
     codigo: cot.codigo,
     version: cot.version,
     estado: cot.estado as EstadoCotizacion,
+    origen: cot.origen as 'crm' | 'tienda',
     cliente: cliente
       ? {
           id: cliente.id,
@@ -180,109 +168,6 @@ async function detalle(cot: FilaCot, u: UsuarioSesion): Promise<CotizacionDetall
     pedido: pedido ?? null,
   }
 }
-
-/**
- * Valida la entrada contra el catálogo actual y arma las líneas con los
- * precios de fábrica de hoy (quedan congelados cuando se envía).
- */
-async function armar(entrada: CotizacionEntrada) {
-  const db = getDb()
-  const config = await leerConfiguracion()
-  const ids = [...new Set(entrada.lineas.map((l) => l.productoId))]
-  const prods = ids.length
-    ? await db
-        .select()
-        .from(productos)
-        .where(and(inArray(productos.id, ids), isNull(productos.borradoEn)))
-    : []
-  const mapa = new Map(prods.map((p) => [p.id, p]))
-  const v = validarPreciosCotizacion(entrada.lineas, mapa, entrada.descuento, config.tope_comercial)
-  if (!v.ok) return v
-  const colores = await coloresDe(
-    db,
-    prods.filter((p) => p.escogeColor).map((p) => p.id)
-  )
-  const vc = validarColoresCotizacion(
-    entrada.lineas,
-    new Map(
-      prods.map((p) => [
-        p.id,
-        { nombre: p.nombre, escogeColor: p.escogeColor, colores: colores.get(p.id) ?? [] },
-      ])
-    )
-  )
-  if (!vc.ok) return vc
-
-  const fotos = ids.length
-    ? await db
-        .select({ productoId: productoArchivos.productoId, url: productoArchivos.url })
-        .from(productoArchivos)
-        .where(and(inArray(productoArchivos.productoId, ids), eq(productoArchivos.tipo, 'imagen')))
-        .orderBy(desc(productoArchivos.esPortada), asc(productoArchivos.id))
-    : []
-  const portada = new Map<number, string>()
-  for (const f of fotos) if (!portada.has(f.productoId)) portada.set(f.productoId, f.url)
-
-  const lineas: LineaCotizacion[] = entrada.lineas.map((l) => {
-    const p = mapa.get(l.productoId)!
-    const color = p.escogeColor
-      ? (colores.get(p.id) ?? []).find((c) => c.bobinaId === l.bobinaId)
-      : undefined
-    const stock = p.escogeColor ? (color?.stock ?? 0) : p.stock
-    return {
-      productoId: p.id,
-      nombre: p.nombre,
-      descripcion: p.descripcion,
-      imagen: portada.get(p.id) ?? null,
-      cantidad: l.cantidad,
-      precioFabrica: p.precioFabrica,
-      precioVenta: l.precioVenta,
-      personalizado: p.tipo === 'personalizado',
-      diasFabricacion: p.diasFabricacion,
-      desdeStock: stock >= l.cantidad,
-      bobinaId: color?.bobinaId ?? null,
-      color: color?.color ?? '',
-      colorHex: color?.colorHex ?? '',
-    }
-  })
-  const resumen = calcularCotizacion(
-    lineas,
-    entrada.cargos,
-    entrada.descuento,
-    entrada.modalidad,
-    config
-  )
-  return { ok: true as const, lineas, resumen, config }
-}
-
-async function guardarHijos(
-  tx: Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0],
-  cotizacionId: number,
-  lineas: LineaCotizacion[],
-  cargos: Cargo[]
-) {
-  await tx.delete(cotizacionLineas).where(eq(cotizacionLineas.cotizacionId, cotizacionId))
-  await tx.delete(cotizacionCargos).where(eq(cotizacionCargos.cotizacionId, cotizacionId))
-  if (lineas.length) {
-    await tx
-      .insert(cotizacionLineas)
-      .values(lineas.map((l, orden) => ({ ...l, cotizacionId, orden })))
-  }
-  if (cargos.length) {
-    await tx.insert(cotizacionCargos).values(cargos.map((cg) => ({ ...cg, cotizacionId })))
-  }
-}
-
-const columnasResumen = (r: Awaited<ReturnType<typeof armar>> & { ok: true }) => ({
-  subtotal: r.resumen.subtotal,
-  totalCargos: r.resumen.cargos,
-  total: r.resumen.total,
-  ganancia: r.resumen.ganancia,
-  anticipoPct: r.resumen.anticipoPct,
-  anticipo: r.resumen.anticipo,
-  diasFabricacion: r.resumen.diasFabricacion,
-  diasEnvio: r.resumen.diasEnvio,
-})
 
 // ===================== Rutas =====================
 
@@ -314,6 +199,7 @@ rutasCotizaciones.get('/', ve, async (c) => {
     codigo: cot.codigo,
     version: cot.version,
     estado: cot.estado as EstadoCotizacion,
+    origen: cot.origen as 'crm' | 'tienda',
     cliente: cot.clienteId ? { id: cot.clienteId, nombre: clienteNombre ?? '' } : null,
     comercial: { id: cot.comercialId, nombre: comercialNombre },
     total: cot.total,

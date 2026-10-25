@@ -146,6 +146,8 @@ function resumen(
     escogeColor: p.escogeColor,
     colores: p.escogeColor ? colores : [],
     precioFabrica: p.precioFabrica,
+    precioTienda: p.precioTienda,
+    enTienda: p.enTienda,
     diasFabricacion: p.diasFabricacion,
     stock: p.stock,
     portada,
@@ -374,6 +376,56 @@ rutasTaller.patch('/productos/:id', deTaller, async (c) => {
     )
   }
   return c.json({ producto: await detalle(id, true) })
+})
+
+/** El Admin fija el precio al público y decide si el producto sale en la tienda web. */
+rutasTaller.patch('/productos/:id/tienda', soloRoles('admin'), async (c) => {
+  const id = Number(c.req.param('id')) || 0
+  const cuerpo = (await c.req.json().catch(() => ({}))) as {
+    precioTienda?: unknown
+    enTienda?: unknown
+  }
+  const db = getDb()
+  const [p] = await db
+    .select()
+    .from(productos)
+    .where(and(eq(productos.id, id), isNull(productos.borradoEn)))
+  if (!p) return c.json({ mensaje: 'No encontramos ese producto.' }, 404)
+
+  const precio =
+    cuerpo.precioTienda === null || cuerpo.precioTienda === ''
+      ? null
+      : Number(cuerpo.precioTienda)
+  if (precio !== null) {
+    if (!Number.isInteger(precio) || precio <= 0 || precio % 1000 !== 0) {
+      return c.json(
+        { mensaje: 'Escribe el precio en pesos, en miles redondos (por ejemplo 45.000).', campo: 'precioTienda' },
+        400
+      )
+    }
+    if (precio < p.precioFabrica) {
+      return c.json(
+        {
+          mensaje: `El precio de la tienda no puede ser menor al precio de fábrica (${p.precioFabrica.toLocaleString('es-CO')}). Sube el valor.`,
+          campo: 'precioTienda',
+        },
+        400
+      )
+    }
+  }
+  const enTienda = cuerpo.enTienda === true
+  if (enTienda && precio === null) {
+    return c.json(
+      { mensaje: 'Para mostrarlo en la tienda primero escribe su precio al público.', campo: 'precioTienda' },
+      400
+    )
+  }
+  await db
+    .update(productos)
+    .set({ precioTienda: precio, enTienda, actualizadoEn: new Date() })
+    .where(eq(productos.id, id))
+  const datos = await detalle(id, true)
+  return c.json({ producto: datos })
 })
 
 rutasTaller.post('/productos/:id/stock', deTaller, async (c) => {

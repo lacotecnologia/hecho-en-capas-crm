@@ -13,6 +13,7 @@ import {
   Layers,
   BarChart3,
   Trash2,
+  UserRound,
 } from 'lucide-react'
 
 export type ItemMenu = {
@@ -50,6 +51,13 @@ export const MENU: GrupoMenu[] = [
         url: '/cotizar',
         icono: FileText,
         descripcion: 'Arma una cotización y descarga el PDF para el cliente',
+        roles: ['admin', 'comercial'],
+      },
+      {
+        titulo: 'Clientes',
+        url: '/clientes',
+        icono: UserRound,
+        descripcion: 'Prospectos de la tienda y clientes, con su WhatsApp',
         roles: ['admin', 'comercial'],
       },
       {

@@ -5,6 +5,7 @@ import { type CotizacionResumen } from '@shared/cotizacion'
 import { FileText, Plus, Search } from 'lucide-react'
 import { tieneRol, useSesion } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ const FILTROS = [
   { id: 'abiertas', nombre: 'Abiertas', estados: ['borrador', 'enviada'] },
   { id: 'borrador', nombre: 'Borradores', estados: ['borrador'] },
   { id: 'enviada', nombre: 'Esperando respuesta', estados: ['enviada'] },
+  { id: 'tienda', nombre: 'De la tienda', estados: ['enviada'] },
   { id: 'aprobada', nombre: 'Aprobadas', estados: ['aprobada'] },
   {
     id: 'cerradas',
@@ -38,7 +40,8 @@ export function ListaCotizaciones() {
   const pasa = (c: CotizacionResumen, f: Filtro) =>
     (FILTROS.find((x) => x.id === f)!.estados as readonly string[]).includes(
       c.estado
-    )
+    ) &&
+    (f !== 'tienda' || c.origen === 'tienda')
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
@@ -148,6 +151,9 @@ export function ListaCotizaciones() {
                       </p>
                     </div>
                     <div className='flex items-center gap-2'>
+                      {c.origen === 'tienda' && (
+                        <Badge variant='outline'>Tienda</Badge>
+                      )}
                       <EstadoCotizacionBadge estado={c.estado} />
                       {vence && (
                         <span

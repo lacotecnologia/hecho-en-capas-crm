@@ -36,6 +36,14 @@ Sistema interno (familiar) para cotizaciones, pedidos, taller, cobros y entregas
 - Borrado lógico, solo el administrador: productos, clientes, cotizaciones, pedidos (solo cancelados), bobinas e impresoras tienen `borrado_en`/`borrado_por`; las listas filtran `isNull(borradoEn)` y la Papelera (`/papelera`) recupera. Rutas en `server/rutas/papelera.ts`; botón `BotonBorrar`.
 - Impresoras: Bambu Lab A1 con AMS lite (multicolor, 3.200.000 COP) y Anycubic Kobra 2 Neo (un color, 800.000 COP).
 
+## Tienda en línea (sitio aparte)
+
+- API pública en `server/rutas/tienda.ts` (`/api/tienda/*`): productos sin sesión; el cliente entra con Google (`/entrar`, verificado en el servidor con `GOOGLE_CLIENT_ID`) y recibe un token propio (`SESSION_SECRET::tienda`, no sirve en el CRM). CORS solo para `TIENDA_ORIGENES`.
+- El Admin fija `productos.precioTienda` y `enTienda` (tarjeta "Tienda en línea" en la ficha). Nunca por debajo del precio de fábrica; la API usa siempre ese precio, no el que mande el navegador.
+- Un pedido web es una cotización `enviada` con `origen = 'tienda'`, asignada a quien tenga "Atiende la tienda" (si nadie, el primer admin). Lógica compartida con Cotizar en `server/cotizaciones-logica.ts`.
+- Quien se registra en la web es cliente en etapa `prospecto` (`origen = 'tienda'`, con `aceptoDatosEn`); pasa a `cliente` al crearse su pedido.
+- La tienda vive en su propia carpeta/repo (HTML + JS); ver su `LEEME.md`.
+
 ## Verificar antes de subir
 
 `pnpm build` (tipos + build) y `pnpm lint` deben pasar sin errores.

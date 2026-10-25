@@ -120,6 +120,8 @@ export type CotizacionResumen = {
   codigo: string
   version: number
   estado: EstadoCotizacion
+  /** `tienda`: la pidió el cliente desde la tienda en línea. */
+  origen: 'crm' | 'tienda'
   cliente: { id: number; nombre: string } | null
   comercial: { id: number; nombre: string }
   total: number

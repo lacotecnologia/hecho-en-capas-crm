@@ -36,6 +36,7 @@ type PersonaDemo = {
   pin: string
   roles: Rol[]
   activo: boolean
+  atiendeTienda: boolean
   intentosFallidos: number
   bloqueadoHasta: string | null
   creadoEn: string
@@ -70,6 +71,7 @@ function inicial(): EstadoDemo {
     pin,
     roles,
     activo: true,
+    atiendeTienda: roles.includes('comercial'),
     intentosFallidos: 0,
     bloqueadoHasta: null,
     creadoEn: ahora,
@@ -220,6 +222,7 @@ const publica = (p: PersonaDemo) => ({
   usuario: p.usuario,
   roles: p.roles,
   activo: p.activo,
+  atiendeTienda: p.atiendeTienda,
   bloqueadoHasta: p.bloqueadoHasta,
   creadoEn: p.creadoEn,
 })
@@ -415,6 +418,7 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
       pin: String(c.pin),
       roles: roles!,
       activo: true,
+      atiendeTienda: false,
       intentosFallidos: 0,
       bloqueadoHasta: null,
       creadoEn: new Date().toISOString(),
@@ -452,6 +456,8 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
       }
       p.activo = Boolean(c.activo)
     }
+    if (c.atiendeTienda !== undefined)
+      p.atiendeTienda = Boolean(c.atiendeTienda)
     if (c.pin !== undefined) {
       if (!PIN_VALIDO.test(String(c.pin))) {
         fallo(400, 'El PIN debe tener de 4 a 6 números.')

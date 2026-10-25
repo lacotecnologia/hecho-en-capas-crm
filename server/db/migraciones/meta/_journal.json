@@ -64,6 +64,13 @@
       "when": 1792724087153,
       "tag": "0008_borrado_logico",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792949824684,
+      "tag": "0009_tienda_web",
+      "breakpoints": true
     }
   ]
 }

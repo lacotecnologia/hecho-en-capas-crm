@@ -22,6 +22,8 @@ export const usuarios = pgTable('usuarios', {
   pinHash: text('pin_hash').notNull(),
   roles: text('roles').array().notNull().default([]),
   activo: boolean('activo').notNull().default(true),
+  /** Recibe las cotizaciones que llegan de la tienda en línea. */
+  atiendeTienda: boolean('atiende_tienda').notNull().default(false),
   intentosFallidos: integer('intentos_fallidos').notNull().default(0),
   bloqueadoHasta: timestamp('bloqueado_hasta', { withTimezone: true }),
   creadoEn: timestamp('creado_en', { withTimezone: true })
@@ -127,6 +129,10 @@ export const productos = pgTable(
     notaAjuste: text('nota_ajuste').notNull().default(''),
     /** Precio con el que trabaja el comercial. */
     precioFabrica: integer('precio_fabrica').notNull().default(0),
+    /** Precio de venta al público en la tienda en línea (null = sin precio). */
+    precioTienda: integer('precio_tienda'),
+    /** Se muestra en la tienda en línea (si además está activo y tiene precio). */
+    enTienda: boolean('en_tienda').notNull().default(false),
     /** Total de unidades impresas. Con colores, es la suma del stock de cada color. */
     stock: integer('stock').notNull().default(0),
     creadoPor: integer('creado_por').references(() => usuarios.id),
@@ -199,6 +205,14 @@ export const clientes = pgTable('clientes', {
   ciudad: text('ciudad').notNull().default(''),
   direccion: text('direccion').notNull().default(''),
   documento: text('documento').notNull().default(''),
+  /** prospecto (se registró en la tienda, aún no compra) | cliente */
+  etapa: text('etapa').notNull().default('cliente'),
+  /** crm (lo creó el equipo) | tienda (se registró en la tienda en línea) */
+  origen: text('origen').notNull().default('crm'),
+  /** Identificador de la cuenta de Google (solo si entró por la tienda). */
+  googleSub: text('google_sub').unique(),
+  /** Cuándo aceptó el tratamiento de sus datos personales. */
+  aceptoDatosEn: timestamp('acepto_datos_en', { withTimezone: true }),
   creadoPor: integer('creado_por').references(() => usuarios.id),
   creadoEn: creadoEn(),
   actualizadoEn: actualizadoEn(),
@@ -223,6 +237,8 @@ export const cotizaciones = pgTable(
     comercialId: integer('comercial_id')
       .notNull()
       .references(() => usuarios.id),
+    /** crm (la hizo el equipo) | tienda (la pidió el cliente en la web) */
+    origen: text('origen').notNull().default('crm'),
     /** recoge | local | nacional */
     modalidad: text('modalidad').notNull().default('local'),
     descuento: integer('descuento').notNull().default(0),

@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, asc, desc, eq, ilike, isNull, or } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { validarCliente } from '../../shared/cotizacion.js'
 import { getDb } from '../db/index.js'
@@ -17,6 +17,9 @@ const columnas = {
   ciudad: clientes.ciudad,
   direccion: clientes.direccion,
   documento: clientes.documento,
+  etapa: clientes.etapa,
+  origen: clientes.origen,
+  creadoEn: clientes.creadoEn,
 }
 
 rutasClientes.get('/', async (c) => {
@@ -29,12 +32,20 @@ rutasClientes.get('/', async (c) => {
         ilike(clientes.documento, `%${q}%`)
       )
     : undefined
+  const etapa = c.req.query('etapa')
+  const soloEtapa =
+    etapa === 'prospecto' || etapa === 'cliente'
+      ? eq(clientes.etapa, etapa)
+      : undefined
   const lista = await db
     .select(columnas)
     .from(clientes)
-    .where(and(isNull(clientes.borradoEn), filtro))
-    .orderBy(asc(clientes.nombre))
-    .limit(50)
+    .where(and(isNull(clientes.borradoEn), filtro, soloEtapa))
+    .orderBy(
+      // Los prospectos nuevos primero: son a quienes hay que escribirles.
+      etapa === 'prospecto' ? desc(clientes.creadoEn) : asc(clientes.nombre)
+    )
+    .limit(etapa ? 200 : 50)
   return c.json({ clientes: lista })
 })
 

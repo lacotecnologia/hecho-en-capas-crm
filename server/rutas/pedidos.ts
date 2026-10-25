@@ -376,6 +376,12 @@ rutasPedidos.post('/', vende, async (c) => {
       })
       .returning({ id: pedidos.id })
 
+    // Quien llegó por la tienda como prospecto pasa a ser cliente con su primer pedido
+    await tx
+      .update(clientes)
+      .set({ etapa: 'cliente', actualizadoEn: new Date() })
+      .where(and(eq(clientes.id, cot.clienteId!), eq(clientes.etapa, 'prospecto')))
+
     for (const [orden, l] of lineas.entries()) {
       // Lo que ya está impreso sale del stock (si alcanza para toda la línea,
       // y del mismo color si el producto tiene colores)

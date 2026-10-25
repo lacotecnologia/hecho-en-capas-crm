@@ -112,6 +112,10 @@ export type ProductoResumen = {
   /** Colores preaprobados (vacío si no escoge color). */
   colores: ColorProducto[]
   precioFabrica: number
+  /** Precio al público en la tienda web (lo fija el Admin). */
+  precioTienda: number | null
+  /** Si se muestra en la tienda web. */
+  enTienda: boolean
   diasFabricacion: number
   /** Total de unidades impresas (suma de todos los colores). */
   stock: number

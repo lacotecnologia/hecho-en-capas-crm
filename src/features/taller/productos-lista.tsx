@@ -9,11 +9,11 @@ import {
 import { Box, Plus, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { PuntosColores } from '@/components/color'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PuntosColores } from '@/components/color'
 import { consultaProductos } from './api'
 import { formatoPesos } from './formato'
 
@@ -175,7 +175,10 @@ export function ProductosLista({ puedeEditar }: { puedeEditar: boolean }) {
                 </p>
                 {p.escogeColor && <PuntosColores colores={p.colores} />}
                 <div className='flex flex-wrap items-center justify-between gap-2'>
-                  <EstadoProductoBadge estado={p.estado} />
+                  <span className='flex flex-wrap items-center gap-1.5'>
+                    <EstadoProductoBadge estado={p.estado} />
+                    {p.enTienda && <Badge variant='outline'>En tienda</Badge>}
+                  </span>
                   <span className='text-sm text-muted-foreground tabular-nums'>
                     {p.stock > 0 ? `${p.stock} en stock` : 'Sin stock'}
                   </span>

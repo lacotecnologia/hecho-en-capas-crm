@@ -60,8 +60,14 @@ export type CotizacionDemo = {
   venceEn: string | null
 }
 
+export type ClienteDemo = Cliente & {
+  etapa?: 'prospecto' | 'cliente'
+  origen?: 'crm' | 'tienda'
+  creadoEn?: string
+}
+
 export type CotizarDemo = {
-  clientes: Cliente[]
+  clientes: ClienteDemo[]
   cotizaciones: CotizacionDemo[]
 }
 
@@ -76,6 +82,30 @@ export function cotizarInicial(): CotizarDemo {
         ciudad: 'Pereira',
         direccion: 'Cra. 7 # 20-15',
         documento: '',
+      },
+      {
+        id: 2,
+        nombre: 'Laura Gómez',
+        whatsapp: '315 888 1020',
+        email: 'laura.gomez@gmail.com',
+        ciudad: 'Dosquebradas',
+        direccion: '',
+        documento: '',
+        etapa: 'prospecto',
+        origen: 'tienda',
+        creadoEn: new Date(Date.now() - 3_600_000 * 5).toISOString(),
+      },
+      {
+        id: 3,
+        nombre: 'Andrés Salazar',
+        whatsapp: '',
+        email: 'andres.salazar@gmail.com',
+        ciudad: 'Pereira',
+        direccion: '',
+        documento: '',
+        etapa: 'prospecto',
+        origen: 'tienda',
+        creadoEn: new Date(Date.now() - 86_400_000 * 2).toISOString(),
       },
     ],
     cotizaciones: [],
@@ -119,18 +149,31 @@ export function atenderCotizar(
     soloVende()
     const [base, query = ''] = ruta.split('?')
     if (base === '/clientes' && metodo === 'GET') {
-      const q = (new URLSearchParams(query).get('q') ?? '').trim().toLowerCase()
+      const params = new URLSearchParams(query)
+      const q = (params.get('q') ?? '').trim().toLowerCase()
+      const etapa = params.get('etapa')
       return {
         clientes: d.clientes
           .filter(
             (x) =>
-              !q ||
-              [x.nombre, x.whatsapp, x.documento].some((t) =>
-                t.toLowerCase().includes(q)
-              )
+              (!q ||
+                [x.nombre, x.whatsapp, x.documento].some((t) =>
+                  t.toLowerCase().includes(q)
+                )) &&
+              (!etapa || (x.etapa ?? 'cliente') === etapa)
           )
-          .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-          .slice(0, 50),
+          .map((x) => ({
+            ...x,
+            etapa: x.etapa ?? 'cliente',
+            origen: x.origen ?? 'crm',
+            creadoEn: x.creadoEn ?? '2026-01-01T12:00:00.000Z',
+          }))
+          .sort((a, b) =>
+            etapa === 'prospecto'
+              ? b.creadoEn.localeCompare(a.creadoEn)
+              : a.nombre.localeCompare(b.nombre, 'es')
+          )
+          .slice(0, 200),
       }
     }
     if (base === '/clientes' && metodo === 'POST') {
@@ -210,6 +253,7 @@ export function atenderCotizar(
       codigo: cot.codigo,
       version: cot.version,
       estado: cot.estado,
+      origen: 'crm',
       cliente: d.clientes.find((x) => x.id === cot.clienteId) ?? null,
       comercial: {
         id: cot.comercialId,
@@ -250,14 +294,20 @@ export function atenderCotizar(
       new Map(
         taller.productos.map((p) => [
           p.id,
-          { nombre: p.nombre, escogeColor: p.escogeColor, colores: coloresDemo(taller, p) },
+          {
+            nombre: p.nombre,
+            escogeColor: p.escogeColor,
+            colores: coloresDemo(taller, p),
+          },
         ])
       )
     )
     if (!vc.ok) return fallo(400, vc.mensaje, vc.campo)
     return e.lineas.map((l): LineaCotizacion => {
       const p = mapa.get(l.productoId)!
-      const color = coloresDemo(taller, p).find((x) => x.bobinaId === l.bobinaId)
+      const color = coloresDemo(taller, p).find(
+        (x) => x.bobinaId === l.bobinaId
+      )
       return {
         productoId: p.id,
         nombre: p.nombre,
@@ -269,7 +319,8 @@ export function atenderCotizar(
         personalizado: p.tipo === 'personalizado',
         diasFabricacion: p.diasFabricacion,
         desdeStock:
-          stockDisponibleDemo(taller, p.id, color?.bobinaId ?? null) >= l.cantidad,
+          stockDisponibleDemo(taller, p.id, color?.bobinaId ?? null) >=
+          l.cantidad,
         bobinaId: color?.bobinaId ?? null,
         color: color?.color ?? '',
         colorHex: color?.colorHex ?? '',
@@ -295,6 +346,7 @@ export function atenderCotizar(
           codigo: x.codigo,
           version: x.version,
           estado: x.estado,
+          origen: 'crm' as const,
           cliente: det.cliente
             ? { id: det.cliente.id, nombre: det.cliente.nombre }
             : null,

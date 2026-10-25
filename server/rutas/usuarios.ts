@@ -18,6 +18,7 @@ const columnasPublicas = {
   usuario: usuarios.usuario,
   roles: usuarios.roles,
   activo: usuarios.activo,
+  atiendeTienda: usuarios.atiendeTienda,
   bloqueadoHasta: usuarios.bloqueadoHasta,
   creadoEn: usuarios.creadoEn,
 }
@@ -118,6 +119,10 @@ rutasUsuarios.patch('/:id', async (c) => {
       return c.json({ mensaje: 'No puedes desactivar tu propio usuario.' }, 400)
     }
     cambios.activo = Boolean(cuerpo.activo)
+  }
+
+  if (cuerpo.atiendeTienda !== undefined) {
+    cambios.atiendeTienda = Boolean(cuerpo.atiendeTienda)
   }
 
   if (cuerpo.pin !== undefined) {

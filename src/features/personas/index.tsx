@@ -7,6 +7,7 @@ import {
   MoreVertical,
   Pencil,
   Power,
+  Store,
   UserPlus,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -115,6 +116,11 @@ export function Personas() {
                       {ROLES_INFO[rol].nombre}
                     </Badge>
                   ))}
+                  {persona.atiendeTienda && (
+                    <Badge className='bg-marca-ambar/30 text-foreground'>
+                      <Store /> Atiende la tienda
+                    </Badge>
+                  )}
                   {!persona.activo && (
                     <Badge variant='outline'>Sin acceso</Badge>
                   )}
@@ -146,6 +152,29 @@ export function Personas() {
                     <DropdownMenuItem onClick={() => setCambiandoPin(persona)}>
                       <KeyRound /> Cambiar PIN
                     </DropdownMenuItem>
+                    {persona.activo &&
+                      persona.roles.some(
+                        (r) => r === 'admin' || r === 'comercial'
+                      ) && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            cambiar.mutate({
+                              persona,
+                              cambios: {
+                                atiendeTienda: !persona.atiendeTienda,
+                              },
+                              aviso: persona.atiendeTienda
+                                ? `${persona.nombre} ya no recibe los pedidos de la tienda.`
+                                : `Los pedidos de la tienda ahora le llegan a ${persona.nombre}.`,
+                            })
+                          }
+                        >
+                          <Store />
+                          {persona.atiendeTienda
+                            ? 'Dejar de atender la tienda'
+                            : 'Que atienda la tienda'}
+                        </DropdownMenuItem>
+                      )}
                     {bloqueada && (
                       <DropdownMenuItem
                         onClick={() =>

@@ -85,6 +85,7 @@ import {
 } from './formato'
 import { EstadoProductoBadge } from './productos-lista'
 import { subirArchivo } from './subir-archivo'
+import { TarjetaTienda } from './tarjeta-tienda'
 
 // ============================================================
 // Entrada: decide si se edita (Taller / Admin) o solo se mira (Comercial)
@@ -202,6 +203,7 @@ function formularioDe(
 }
 
 function Editor({ producto }: { producto: ProductoDetalle | null }) {
+  const usuario = useSesion()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: config } = useQuery(consultaConfiguracion)
@@ -465,6 +467,11 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
 
           {/* ---------- Fotos y archivos ---------- */}
           <SeccionArchivos producto={producto} />
+
+          {/* ---------- Tienda en línea (solo Admin) ---------- */}
+          {producto && tieneRol(usuario, ['admin']) && (
+            <TarjetaTienda producto={producto} />
+          )}
 
           {/* ---------- Cómo se imprime ---------- */}
           <Card>

@@ -8,6 +8,8 @@ export type Persona = {
   usuario: string
   roles: Rol[]
   activo: boolean
+  /** Recibe los pedidos que llegan de la tienda en línea. */
+  atiendeTienda: boolean
   bloqueadoHasta: string | null
   creadoEn: string
 }
@@ -33,6 +35,7 @@ export function actualizarPersona(
     nombre: string
     roles: Rol[]
     activo: boolean
+    atiendeTienda: boolean
     pin: string
     desbloquear: boolean
   }>

@@ -20,6 +20,7 @@ import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedConfiguracionRouteImport } from './routes/_authenticated/configuracion'
 import { Route as AuthenticatedColaRouteImport } from './routes/_authenticated/cola'
 import { Route as AuthenticatedCobrosRouteImport } from './routes/_authenticated/cobros'
+import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
@@ -86,6 +87,11 @@ const AuthenticatedColaRoute = AuthenticatedColaRouteImport.update({
 const AuthenticatedCobrosRoute = AuthenticatedCobrosRouteImport.update({
   id: '/cobros',
   path: '/cobros',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const errors503Route = errors503RouteImport.update({
@@ -161,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/clientes': typeof AuthenticatedClientesRoute
   '/cobros': typeof AuthenticatedCobrosRoute
   '/cola': typeof AuthenticatedColaRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
@@ -184,6 +191,7 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/clientes': typeof AuthenticatedClientesRoute
   '/cobros': typeof AuthenticatedCobrosRoute
   '/cola': typeof AuthenticatedColaRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
@@ -210,6 +218,7 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
+  '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/cobros': typeof AuthenticatedCobrosRoute
   '/_authenticated/cola': typeof AuthenticatedColaRoute
   '/_authenticated/configuracion': typeof AuthenticatedConfiguracionRoute
@@ -237,6 +246,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/clientes'
     | '/cobros'
     | '/cola'
     | '/configuracion'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/clientes'
     | '/cobros'
     | '/cola'
     | '/configuracion'
@@ -285,6 +296,7 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
+    | '/_authenticated/clientes'
     | '/_authenticated/cobros'
     | '/_authenticated/cola'
     | '/_authenticated/configuracion'
@@ -394,6 +406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCobrosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/clientes': {
+      id: '/_authenticated/clientes'
+      path: '/clientes'
+      fullPath: '/clientes'
+      preLoaderRoute: typeof AuthenticatedClientesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/(errors)/503': {
       id: '/(errors)/503'
       path: '/503'
@@ -482,6 +501,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedCobrosRoute: typeof AuthenticatedCobrosRoute
   AuthenticatedColaRoute: typeof AuthenticatedColaRoute
   AuthenticatedConfiguracionRoute: typeof AuthenticatedConfiguracionRoute
@@ -499,6 +519,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedCobrosRoute: AuthenticatedCobrosRoute,
   AuthenticatedColaRoute: AuthenticatedColaRoute,
   AuthenticatedConfiguracionRoute: AuthenticatedConfiguracionRoute,
