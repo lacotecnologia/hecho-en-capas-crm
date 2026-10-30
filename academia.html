@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hecho en Capas · Academia</title>
+    <meta name="description" content="Cursos de impresión 3D de Hecho en Capas. Aparta tu cupo: abrimos el grupo cuando se complete." />
+    <link rel="icon" type="image/png" href="images/favicon.png" />
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Poppins:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="saltar" href="#cupo">Ir al formulario</a>
+
+    <header class="barra">
+      <div class="contenedor barra__fila">
+        <a class="logo" href="/" aria-label="Hecho en Capas, inicio">
+          <img src="images/icono.png" alt="" width="40" height="40" />
+          <span class="logo__texto" aria-hidden="true"><span>Hecho</span><span><b class="amb">en</b><b class="ver">Capas</b></span></span>
+        </a>
+        <nav class="menu" aria-label="Principal">
+          <a href="/#tienda">Tienda</a>
+          <a href="/#medida">A tu medida</a>
+          <a href="/academia" aria-current="page">Academia</a>
+        </nav>
+        <div class="acciones">
+          <a class="btn btn--suave" href="/#tienda">Ver la tienda</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="academia">
+        <div class="contenedor academia__fila">
+          <div class="academia__texto">
+            <p class="sello-chico">Academia Hecho en Capas</p>
+            <h1>Aprende a <span class="resalta">imprimir en 3D</span>, desde cero.</h1>
+            <p class="academia__intro">
+              Estamos armando el primer grupo de cursos de impresión 3D. Aparta tu cupo sin costo y sin compromiso:
+              cuando el grupo esté completo, te escribimos con las fechas, el lugar y el valor.
+            </p>
+            <ul class="academia__lista">
+              <li><b>Diseña tu primera pieza</b> en el computador, aunque nunca lo hayas hecho.</li>
+              <li><b>Prepara el archivo</b> para que salga bien a la primera.</li>
+              <li><b>Imprímela tú mismo</b> en una impresora de verdad y llévatela.</li>
+            </ul>
+            <p class="chico">Grupos pequeños para que todos practiquen. No necesitas tener impresora.</p>
+          </div>
+
+          <div class="academia__tarjeta" id="cupo">
+            <div id="cupo-contenido">
+              <h2 class="academia__titulo">Aparta tu cupo</h2>
+              <p class="subtitulo">Son solo 4 datos. Te avisamos cuando abramos el grupo.</p>
+              <form class="form" id="form-cupo" novalidate>
+                <label class="campo">Tu nombre
+                  <input name="nombre" required autocomplete="name" placeholder="Nombre y apellido" />
+                </label>
+                <label class="campo">Tu celular<small>Por aquí te escribimos por WhatsApp</small>
+                  <input name="celular" required inputmode="tel" autocomplete="tel" placeholder="300 123 4567" />
+                </label>
+                <label class="campo">Tu correo
+                  <input name="correo" type="email" required autocomplete="email" placeholder="tucorreo@ejemplo.com" />
+                </label>
+                <label class="campo">Tu ciudad
+                  <input name="ciudad" required autocomplete="address-level2" placeholder="Ej. Pereira" />
+                </label>
+                <label class="acepto">
+                  <input type="checkbox" name="acepto" required />
+                  <span>Autorizo a Hecho en Capas a usar estos datos solo para avisarme de los cursos. Puedo pedir que los borren cuando quiera.</span>
+                </label>
+                <p class="aviso" id="cupo-error" hidden></p>
+                <button class="btn btn--grande btn--ancho" type="submit">Apartar mi cupo</button>
+                <p class="chico" style="margin:0;text-align:center">Al tocar el botón se abre WhatsApp con tus datos. Solo tienes que enviarlo.</p>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="pie">
+      <div class="contenedor pie__fila">
+        <span class="logo logo--claro"><img src="images/icono.png" alt="" width="34" height="34" /><span class="logo__texto"><span>Hecho</span><span><b class="amb">en</b><b class="lim">Capas</b></span></span></span>
+        <p>Impresión 3D hecha con cariño.</p>
+      </div>
+    </footer>
+
+    <script type="module">
+      import { CONFIG } from './js/config.js'
+
+      const form = document.getElementById('form-cupo')
+      const error = document.getElementById('cupo-error')
+
+      function revisar(d) {
+        if (d.nombre.length < 3) return ['nombre', 'Escribe tu nombre.']
+        if (d.celular.replace(/\D/g, '').length < 10) return ['celular', 'Escribe tu celular completo, con los 10 números.']
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.correo)) return ['correo', 'Revisa tu correo: debe verse como nombre@correo.com.']
+        if (d.ciudad.length < 3) return ['ciudad', 'Escribe tu ciudad.']
+        if (!d.acepto) return ['acepto', 'Marca la casilla de autorización para poder avisarte.']
+        return null
+      }
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault()
+        const f = new FormData(form)
+        const d = {
+          nombre: String(f.get('nombre') || '').trim(),
+          celular: String(f.get('celular') || '').trim(),
+          correo: String(f.get('correo') || '').trim(),
+          ciudad: String(f.get('ciudad') || '').trim(),
+          acepto: f.get('acepto') === 'on',
+        }
+        const fallo = revisar(d)
+        if (fallo) {
+          error.textContent = fallo[1]
+          error.hidden = false
+          form.elements[fallo[0]].focus()
+          return
+        }
+        error.hidden = true
+        const texto = [
+          'Hola, quiero apartar mi cupo en los cursos de impresión 3D de la Academia Hecho en Capas.',
+          '',
+          `Nombre: ${d.nombre}`,
+          `Celular: ${d.celular}`,
+          `Correo: ${d.correo}`,
+          `Ciudad: ${d.ciudad}`,
+          '',
+          'Autorizo usar mis datos solo para avisarme de los cursos.',
+        ].join('\n')
+        const wa = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(texto)}`
+        window.open(wa, '_blank', 'noopener')
+        document.getElementById('cupo-contenido').innerHTML = `
+          <div class="listo">
+            <div class="listo__marca"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg></div>
+            <h2 class="academia__titulo">Ya casi, ${d.nombre.split(' ')[0].replace(/[<>&"]/g, '')}</h2>
+            <p>Se abrió WhatsApp con tus datos. <b>Toca enviar</b> y tu cupo queda apartado. Te escribimos cuando el grupo esté completo.</p>
+            <div class="portada__botones" style="justify-content:center">
+              <a class="btn" href="${wa}" target="_blank" rel="noopener">Abrir WhatsApp otra vez</a>
+              <a class="btn btn--borde" href="/#tienda">Ver la tienda</a>
+            </div>
+          </div>`
+      })
+    </script>
+  </body>
+</html>
