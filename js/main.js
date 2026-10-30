@@ -56,32 +56,48 @@ function pintarFiltros() {
   })
 }
 
-function colorHex(id) { return COLORES[id].hex }
+function colorHex(id) { return COLORES[id]?.hex ?? '#cccccc' }
+const conPrecio = (p) => typeof p.precio === 'number'
+function precioTexto(p) {
+  if (!conPrecio(p)) return '<span class="precio--consulta">Consulta el precio</span>'
+  return (p.personalizado ? '<small class="chico" style="font-weight:500">desde </small>' : '') + pesos(p.precio)
+}
+function detalleLinea(l) {
+  return [l.color ? COLORES[l.color].nombre : '', l.tam || ''].filter(Boolean).join(' · ')
+}
+function waProducto(p, color, tam, cant) {
+  const extra = [color ? `color ${COLORES[color].nombre}` : '', tam ? `tamaño ${tam}` : '', cant > 1 ? `${cant} unidades` : ''].filter(Boolean).join(', ')
+  const texto = `Hola, me interesa: ${p.nombre}${extra ? ' (' + extra + ')' : ''}. ¿Me das el precio y el tiempo de entrega?`
+  return `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(texto)}`
+}
 
 function pintarCatalogo() {
   const rej = $('#rejilla')
   rej.innerHTML = ''
-  PRODUCTOS.filter((p) => estado.filtro === 'todo' || p.categoria === estado.filtro).forEach((p) => {
+  PRODUCTOS.filter((p) => estado.filtro === 'todo' || p.categoria === estado.filtro || (estado.filtro === 'medida' && p.personalizado)).forEach((p) => {
+    const foto = p.fotos?.[0]
     const art = document.createElement('article')
     art.className = 'tarjeta'
     art.innerHTML = `
-      <button class="tarjeta__img" type="button" aria-label="Ver ${esc(p.nombre)} en 3D">
-        <canvas width="520" height="390"></canvas>
+      <button class="tarjeta__img" type="button" aria-label="Ver ${esc(p.nombre)}">
+        ${foto ? `<img src="${foto}" alt="${esc(p.nombre)}" loading="lazy" />` : '<canvas width="520" height="390"></canvas>'}
         <span class="etiqueta">${esc(p.etiqueta)}</span>
-        <span class="tarjeta__ver">Ver en 3D</span>
+        <span class="tarjeta__ver">${foto ? (p.fotos.length > 1 ? `Ver ${p.fotos.length} fotos` : 'Ver foto') : 'Ver en 3D'}</span>
       </button>
       <div class="tarjeta__cuerpo">
         <h3>${esc(p.nombre)}</h3>
         <p class="tarjeta__corto">${esc(p.corto)}</p>
         <div class="tarjeta__pie">
-          <span class="precio">${p.personalizado ? '<small class="chico" style="font-weight:500">desde </small>' : ''}${pesos(p.precio)}</span>
+          <span class="precio">${precioTexto(p)}</span>
           <span class="mini-colores" aria-label="Colores disponibles">${p.colores.map((c) => `<i style="background:${colorHex(c)}" title="${COLORES[c].nombre}"></i>`).join('')}</span>
         </div>
-        <button class="btn btn--ancho" type="button" style="margin-top:10px">Escoger y agregar</button>
+        <button class="btn btn--ancho" type="button" style="margin-top:10px">Ver y pedir</button>
       </div>`
     const cv = $('canvas', art)
     const hex = colorHex(p.colores[0])
-    if (WEBGL) {
+    if (!cv) {
+      // tarjeta con foto: nada que dibujar
+    } else if (WEBGL && p.modelo) {
       dibujarTarjeta(cv, p.modelo, hex)
       let raf, t0
       const girar = (t) => {
@@ -109,27 +125,76 @@ const dlgProducto = $('#dlg-producto')
 
 function abrirProducto(id) {
   const p = producto(id)
-  actual = { id, color: p.colores[0], cant: 1 }
+  actual = { id, color: p.colores[0] ?? null, tam: p.tamanos?.[0] ?? null, cant: 1 }
   $('#p-etiqueta').textContent = p.etiqueta
   $('#p-nombre').textContent = p.nombre
-  $('#p-precio').textContent = (p.personalizado ? 'Desde ' : '') + pesos(p.precio)
+  $('#p-precio').textContent = conPrecio(p) ? (p.personalizado ? 'Desde ' : '') + pesos(p.precio) : 'Consulta el precio'
   $('#p-detalle').textContent = p.detalle
-  $('#p-dias').textContent = `Lo fabricamos en unos ${p.dias} días.`
+  $('#p-dias').textContent = p.dias ? `Lo fabricamos en unos ${p.dias} días.` : ''
+  $('#p-dias').hidden = !p.dias
   const nota = $('#p-nota')
   nota.hidden = !p.personalizado
-  nota.textContent = p.personalizado ? 'Este producto es a tu medida: pagas el 50 % para empezar y el resto cuando esté listo.' : ''
+  nota.textContent = p.personalizado ? 'Es a tu medida: te mostramos cómo va a quedar antes de fabricarlo y pagas el 50 % para empezar.' : ''
+  pintarTamanos(p)
   pintarColores(p)
   $('#p-cant').textContent = '1'
+  actualizarWa()
+  const fotos = p.fotos || []
+  $('#p-galeria').hidden = !fotos.length
+  $('#canvas-visor').hidden = !!fotos.length
+  $('.visor__ayuda').hidden = !!fotos.length
+  if (fotos.length) pintarGaleria(p, 0)
   abrir(dlgProducto)
-  if (WEBGL) {
+  if (WEBGL && !fotos.length && p.modelo) {
     visor ??= crearVisor($('#canvas-visor'))
     visor.cargar(p.modelo, colorHex(actual.color))
     visor.iniciar()
   }
 }
+function pintarGaleria(p, i) {
+  const img = $('#p-foto')
+  img.src = p.fotos[i]
+  img.alt = `${p.nombre}, foto ${i + 1} de ${p.fotos.length}`
+  const mini = $('#p-miniaturas')
+  mini.innerHTML = ''
+  mini.hidden = p.fotos.length < 2
+  p.fotos.forEach((f, j) => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.setAttribute('aria-label', `Ver foto ${j + 1}`)
+    b.setAttribute('aria-current', String(i === j))
+    b.innerHTML = `<img src="${f}" alt="" />`
+    b.addEventListener('click', () => pintarGaleria(p, j))
+    mini.append(b)
+  })
+}
+function actualizarWa() {
+  const p = producto(actual.id)
+  $('#p-wa').href = waProducto(p, actual.color, actual.tam, actual.cant)
+}
+function pintarTamanos(p) {
+  const cont = $('#p-tamanos')
+  cont.innerHTML = ''
+  $('#p-bloque-tam').hidden = !(p.tamanos && p.tamanos.length)
+  ;(p.tamanos || []).forEach((t) => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.setAttribute('role', 'radio')
+    b.setAttribute('aria-checked', String(t === actual.tam))
+    b.textContent = t
+    b.addEventListener('click', () => {
+      actual.tam = t
+      $$('button', cont).forEach((x) => x.setAttribute('aria-checked', String(x === b)))
+      actualizarWa()
+    })
+    cont.append(b)
+  })
+}
 function pintarColores(p) {
   const cont = $('#p-colores')
   cont.innerHTML = ''
+  $('#p-bloque-color').hidden = !p.colores.length
+  if (!p.colores.length) return
   p.colores.forEach((c) => {
     const b = document.createElement('button')
     b.type = 'button'
@@ -143,26 +208,27 @@ function pintarColores(p) {
       visor?.pintar(colorHex(c))
       $$('button', cont).forEach((x) => x.setAttribute('aria-checked', String(x === b)))
       $('#p-color-nombre').textContent = COLORES[c].nombre
+      actualizarWa()
     })
     cont.append(b)
   })
   $('#p-color-nombre').textContent = COLORES[actual.color].nombre
 }
 dlgProducto.addEventListener('close', () => visor?.detener())
-$('#p-menos').addEventListener('click', () => { actual.cant = Math.max(1, actual.cant - 1); $('#p-cant').textContent = actual.cant })
-$('#p-mas').addEventListener('click', () => { actual.cant = Math.min(20, actual.cant + 1); $('#p-cant').textContent = actual.cant })
+$('#p-menos').addEventListener('click', () => { actual.cant = Math.max(1, actual.cant - 1); $('#p-cant').textContent = actual.cant; actualizarWa() })
+$('#p-mas').addEventListener('click', () => { actual.cant = Math.min(20, actual.cant + 1); $('#p-cant').textContent = actual.cant; actualizarWa() })
 $('#p-agregar').addEventListener('click', () => {
-  agregar(actual.id, actual.color, actual.cant)
+  agregar(actual.id, actual.color, actual.tam, actual.cant)
   dlgProducto.close()
   const p = producto(actual.id)
-  aviso(`Agregamos ${actual.cant} × ${p.nombre} a tu carrito`)
+  aviso(`Agregamos ${actual.cant} × ${p.nombre} a tu pedido`)
 })
 
 /* ---------- Carrito ---------- */
-function agregar(id, color, cant) {
-  const l = estado.carrito.find((x) => x.id === id && x.color === color)
+function agregar(id, color, tam, cant) {
+  const l = estado.carrito.find((x) => x.id === id && x.color === color && x.tam === tam)
   if (l) l.qty = Math.min(50, l.qty + cant)
-  else estado.carrito.push({ id, color, qty: cant })
+  else estado.carrito.push({ id, color, tam, qty: cant })
   persistirCarrito()
   const b = $('#btn-carrito')
   b.classList.remove('salto'); void b.offsetWidth; b.classList.add('salto')
@@ -178,15 +244,17 @@ function totales() {
   let total = 0
   let anticipo = 0
   let resto = 0
+  const porCotizar = estado.carrito.some((l) => !conPrecio(producto(l.id)))
   estado.carrito.forEach((l) => {
     const p = producto(l.id)
+    if (!conPrecio(p)) return
     const v = p.precio * l.qty
     total += v
     if (p.personalizado) anticipo += Math.ceil(v / 2 / 1000) * 1000
     else resto += v
   })
   const hayPers = estado.carrito.some((l) => producto(l.id).personalizado)
-  return { total, hayPers, pagoAhora: hayPers ? resto + anticipo : total, falta: hayPers ? total - (resto + anticipo) : 0 }
+  return { total, hayPers, porCotizar, pagoAhora: hayPers ? resto + anticipo : total, falta: hayPers ? total - (resto + anticipo) : 0 }
 }
 function pintarCarrito() {
   const lista = $('#c-lista')
@@ -204,14 +272,14 @@ function pintarCarrito() {
     const fila = document.createElement('div')
     fila.className = 'linea'
     fila.innerHTML = `
-      <canvas width="152" height="114"></canvas>
+      ${p.fotos?.length ? `<img src="${p.fotos[0]}" alt="" />` : '<canvas width="152" height="114"></canvas>'}
       <div>
         <h4>${esc(p.nombre)}</h4>
-        <small><i style="background:${colorHex(l.color)}"></i>${COLORES[l.color].nombre}</small>
+        <small>${l.color ? `<i style="background:${colorHex(l.color)}"></i>` : ''}${esc(detalleLinea(l))}</small>
         <div class="mini-cant"><button type="button" aria-label="Quitar una">−</button><output>${l.qty}</output><button type="button" aria-label="Agregar una">+</button></div>
       </div>
-      <div class="linea__der"><b>${pesos(p.precio * l.qty)}</b><button class="linea__quitar" type="button">Quitar</button></div>`
-    if (WEBGL) dibujarTarjeta($('canvas', fila), p.modelo, colorHex(l.color))
+      <div class="linea__der"><b>${conPrecio(p) ? pesos(p.precio * l.qty) : '<span class="chico">Por cotizar</span>'}</b><button class="linea__quitar" type="button">Quitar</button></div>`
+    if (WEBGL && p.modelo && $('canvas', fila)) dibujarTarjeta($('canvas', fila), p.modelo, colorHex(l.color))
     const [menos, mas] = $$('.mini-cant button', fila)
     menos.addEventListener('click', () => { l.qty = Math.max(1, l.qty - 1); persistirCarrito() })
     mas.addEventListener('click', () => { l.qty = Math.min(50, l.qty + 1); persistirCarrito() })
@@ -219,7 +287,10 @@ function pintarCarrito() {
     lista.append(fila)
   })
   const t = totales()
-  pie.innerHTML = `
+  pie.innerHTML = t.porCotizar
+    ? `<p class="chico">Te confirmamos el precio por WhatsApp antes de cobrar. Lo que es a tu medida se paga 50 % para empezar. Sin IVA.</p>
+    <button class="btn btn--grande btn--ancho" type="button" id="c-pedir">Enviar mi pedido</button>`
+    : `
     <div class="suma suma--total"><span>Total</span><span>${pesos(t.total)}</span></div>
     ${t.hayPers ? `<div class="suma suma--anticipo"><span>Pagas ahora</span><span>${pesos(t.pagoAhora)}</span></div><p class="chico">Lo que es a tu medida se paga 50 % para empezar. El resto (${pesos(t.falta)}) cuando esté listo.</p>` : '<p class="chico">Sin IVA. El domicilio se confirma al hacer el pedido.</p>'}
     <button class="btn btn--grande btn--ancho" type="button" id="c-pedir">Hacer mi pedido</button>`
@@ -338,9 +409,9 @@ function empezarPedido() {
       <label class="campo" id="campo-dir">Dirección de entrega<input name="direccion" autocomplete="street-address" placeholder="Calle, número, barrio" /></label>
       <label class="campo">¿Algo más que debamos saber? <small>Opcional. Si es a tu medida, cuéntanos el nombre o el logo.</small><textarea name="nota" rows="3"></textarea></label>
       <div>
-        <div class="suma suma--total" style="margin:0 0 4px"><span>Total</span><span>${pesos(t.total)}</span></div>
-        ${t.hayPers ? `<div class="suma suma--anticipo"><span>Pagas ahora</span><span>${pesos(t.pagoAhora)}</span></div>` : ''}
-        <p class="chico">Al tocar el botón se abre WhatsApp con tu pedido escrito. Solo tienes que enviarlo y te confirmamos cómo pagar.</p>
+        ${t.porCotizar ? '' : `<div class="suma suma--total" style="margin:0 0 4px"><span>Total</span><span>${pesos(t.total)}</span></div>
+        ${t.hayPers ? `<div class="suma suma--anticipo"><span>Pagas ahora</span><span>${pesos(t.pagoAhora)}</span></div>` : ''}`}
+        <p class="chico">Al tocar el botón se abre WhatsApp con tu pedido escrito. Solo tienes que enviarlo y te confirmamos ${t.porCotizar ? 'el precio y ' : ''}cómo pagar.</p>
       </div>
       <p class="aviso" id="ped-error" hidden></p>
       <button class="btn btn--grande btn--ancho" type="submit" id="ped-enviar">Enviar mi pedido por WhatsApp</button>
@@ -363,8 +434,8 @@ async function enviarPedido(e) {
   const form = e.target
   const f = new FormData(form)
   const t = totales()
-  const dias = Math.max(...estado.carrito.map((l) => producto(l.id).dias))
-  const fecha = new Date(Date.now() + dias * 86400000)
+  const dias = Math.max(0, ...estado.carrito.map((l) => producto(l.id).dias || 0))
+  const fecha = dias ? new Date(Date.now() + dias * 86400000) : null
   const pedido = {
     codigo: 'HEC-' + Date.now().toString(36).slice(-5).toUpperCase(),
     fecha: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }),
@@ -378,7 +449,8 @@ async function enviarPedido(e) {
     entrega: String(f.get('entrega')),
     direccion: String(f.get('direccion') || '').trim(),
     nota: String(f.get('nota') || '').trim(),
-    items: estado.carrito.map((l) => ({ id: l.id, nombre: producto(l.id).nombre, color: COLORES[l.color].nombre, qty: l.qty, precio: producto(l.id).precio, personalizado: producto(l.id).personalizado })),
+    items: estado.carrito.map((l) => ({ id: l.id, nombre: producto(l.id).nombre, color: detalleLinea(l), qty: l.qty, precio: producto(l.id).precio, personalizado: producto(l.id).personalizado })),
+    porCotizar: t.porCotizar,
     total: t.total,
     pagoAhora: t.pagoAhora,
   }
@@ -407,7 +479,7 @@ async function enviarPedido(e) {
   guardar('hec_tienda_pedidos', estado.pedidos)
   estado.carrito = []
   persistirCarrito()
-  const fechaTxt = fecha.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })
+  const fechaTxt = fecha ? fecha.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }) : ''
   const wa = CONFIG.WHATSAPP ? `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(mensajePedido(pedido, fechaTxt))}` : ''
   if (wa) window.open(wa, '_blank', 'noopener')
   $('#ped-contenido').innerHTML = `
@@ -415,7 +487,7 @@ async function enviarPedido(e) {
       <div class="listo__marca"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg></div>
       <h3 id="ped-titulo">${CONFIG.API_PEDIDOS ? '¡Recibimos tu pedido!' : 'Ya casi: envíalo en WhatsApp'}</h3>
       <span class="codigo">${esc(pedido.codigo)}</span>
-      <p>${CONFIG.API_PEDIDOS ? '' : 'Se abrió WhatsApp con tu pedido escrito. <b>Toca enviar</b> para que nos llegue. '}Te confirmamos cómo pagar y lo tendríamos listo hacia el <b>${fechaTxt}</b>.</p>
+      <p>${CONFIG.API_PEDIDOS ? '' : 'Se abrió WhatsApp con tu pedido escrito. <b>Toca enviar</b> para que nos llegue. '}Te confirmamos ${pedido.porCotizar ? 'el precio, ' : ''}cómo pagar${fechaTxt ? ` y lo tendríamos listo hacia el <b>${fechaTxt}</b>` : ' y la fecha de entrega'}.</p>
       <div class="portada__botones" style="justify-content:center">
         ${wa ? `<a class="btn" href="${wa}" target="_blank" rel="noopener">${CONFIG.API_PEDIDOS ? 'Avisar por WhatsApp' : 'Abrir WhatsApp otra vez'}</a>` : ''}
         <button class="btn btn--borde" type="button" id="ped-seguir">Seguir mirando</button>
@@ -425,21 +497,20 @@ async function enviarPedido(e) {
 }
 
 function mensajePedido(p, fechaTxt) {
-  const lineas = p.items.map((i) => `• ${i.qty} × ${i.nombre} (${i.color}) — ${pesos(i.precio * i.qty)}`)
+  const lineas = p.items.map((i) => `• ${i.qty} × ${i.nombre}${i.color ? ` (${i.color})` : ''}${typeof i.precio === 'number' ? ` — ${pesos(i.precio * i.qty)}` : ''}`)
   const entrega = p.entrega === 'Domicilio' ? `Domicilio: ${p.direccion}, ${p.cliente.ciudad}` : `Lo recojo yo (${p.cliente.ciudad})`
   return [
     `Hola, quiero hacer este pedido en Hecho en Capas (${p.codigo}):`,
     '',
     ...lineas,
     '',
-    `Total: ${pesos(p.total)}`,
-    ...(p.pagoAhora < p.total ? [`Anticipo para empezar: ${pesos(p.pagoAhora)}`] : []),
+    ...(p.porCotizar ? ['Por favor confírmame el precio.'] : [`Total: ${pesos(p.total)}`, ...(p.pagoAhora < p.total ? [`Anticipo para empezar: ${pesos(p.pagoAhora)}`] : [])]),
     '',
     `Nombre: ${p.cliente.nombre}`,
     `Celular: ${p.cliente.celular}`,
     entrega,
     ...(p.nota ? [`Nota: ${p.nota}`] : []),
-    `Fecha aproximada: ${fechaTxt}`,
+    ...(fechaTxt ? [`Fecha aproximada: ${fechaTxt}`] : []),
   ].join('\n')
 }
 

@@ -265,3 +265,18 @@ input:focus, select:focus, textarea:focus { outline: 3px solid rgb(0 122 82 / 0.
 .solo-cel { display: none; }
 @media (max-width: 900px) { .solo-cel { display: inline-flex; padding: 8px 14px; } }
 .trampa { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+/* Fotos de producto */
+.tarjeta__img { overflow: hidden; }
+.tarjeta__img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 12%; }
+.precio--consulta { font-size: 1rem; color: var(--verde); }
+.galeria { position: absolute; inset: 0; display: flex; flex-direction: column; background: #f4f1ea; }
+.galeria > img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.galeria__miniaturas { display: flex; gap: 8px; padding: 10px; justify-content: center; flex-wrap: wrap; }
+.galeria__miniaturas button { width: 58px; height: 58px; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; background: #fff; }
+.galeria__miniaturas button[aria-current="true"] { border-color: var(--verde); }
+.galeria__miniaturas img { width: 100%; height: 100%; object-fit: cover; }
+.tamanos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.tamanos button { border: 1.5px solid #d6d3d1; background: #fff; border-radius: 999px; padding: 8px 14px; font-size: .9rem; font-weight: 500; }
+.tamanos button[aria-checked="true"] { border-color: var(--verde); background: var(--acento); color: var(--verde-osc); font-weight: 700; }
+.linea > img { width: 76px; height: 57px; border-radius: 10px; object-fit: cover; }

@@ -84,7 +84,7 @@
         <div class="contenedor">
           <h2 class="titulo">Así de fácil es pedir</h2>
           <ol class="pasos">
-            <li><span class="paso__n">1</span><h3>Escoge</h3><p>Mira los productos, gíralos en 3D y elige el color que más te guste.</p></li>
+            <li><span class="paso__n">1</span><h3>Escoge</h3><p>Mira los productos, sus fotos y elige el color y el tamaño que más te gusten.</p></li>
             <li><span class="paso__n">2</span><h3>Pide por WhatsApp</h3><p>Armas tu carrito y el pedido nos llega por WhatsApp. Si es a tu medida, solo pagas la mitad para empezar.</p></li>
             <li><span class="paso__n">3</span><h3>Lo fabricamos</h3><p>Imprimimos tu pedido capa por capa y te avisamos apenas esté listo.</p></li>
             <li><span class="paso__n">4</span><h3>Te lo llevamos</h3><p>Lo recibes en tu casa, o lo recoges tú si te queda más fácil.</p></li>
@@ -97,7 +97,7 @@
           <div class="tienda__cab">
             <div>
               <h2 class="titulo">Nuestros productos</h2>
-              <p class="subtitulo">Pasa el mouse o toca un producto para verlo girar.</p>
+              <p class="subtitulo">Toca un producto para ver sus fotos, escoger color y tamaño, y pedirlo.</p>
             </div>
             <div class="filtros" id="filtros" role="group" aria-label="Filtrar productos"></div>
           </div>
@@ -128,7 +128,7 @@
           <h2 class="titulo">Preguntas que nos hacen</h2>
           <details><summary>¿Cuánto se demora mi pedido?</summary><p>Cada producto dice cuántos días tarda en fabricarse. Al hacer tu pedido verás la fecha aproximada, y te escribimos por WhatsApp cuando esté listo.</p></details>
           <details><summary>¿Cómo pago?</summary><p>En los productos listos pagas el total al hacer el pedido. En los hechos a tu medida pagas el 50 % para empezar y el resto cuando esté listo. Tu pedido nos llega por WhatsApp y ahí te confirmamos cómo pagar.</p></details>
-          <details><summary>¿Puedo escoger el color?</summary><p>Sí. En cada producto aparecen los colores disponibles. Al elegir uno, el modelo 3D cambia para que veas cómo se verá.</p></details>
+          <details><summary>¿Puedo escoger el color?</summary><p>Sí. En cada producto aparecen los colores disponibles. Si quieres otro, pregúntanos por WhatsApp.</p></details>
           <details><summary>¿Cómo me lo entregan?</summary><p>Puede ser con domicilio en tu ciudad o con una empresa de envíos. También puedes recogerlo tú. Lo eliges al hacer el pedido.</p></details>
           <details><summary>¿Cobran IVA?</summary><p>No. El precio que ves es el que pagas, sin sorpresas.</p></details>
         </div>
@@ -149,6 +149,10 @@
         <div class="visor__escena">
           <canvas id="canvas-visor" aria-label="Modelo 3D del producto, arrástralo para girarlo"></canvas>
           <p class="visor__ayuda">Arrastra para girarlo</p>
+          <div class="galeria" id="p-galeria" hidden>
+            <img id="p-foto" alt="" />
+            <div class="galeria__miniaturas" id="p-miniaturas"></div>
+          </div>
         </div>
         <div class="visor__info">
           <span class="etiqueta" id="p-etiqueta"></span>
@@ -156,8 +160,14 @@
           <p class="visor__precio" id="p-precio"></p>
           <p id="p-detalle"></p>
           <p class="visor__dias" id="p-dias"></p>
-          <p class="campo__titulo">Color: <b id="p-color-nombre"></b></p>
-          <div class="colores" id="p-colores" role="radiogroup" aria-label="Color"></div>
+          <div id="p-bloque-tam">
+            <p class="campo__titulo">Tamaño</p>
+            <div class="tamanos" id="p-tamanos" role="radiogroup" aria-label="Tamaño"></div>
+          </div>
+          <div id="p-bloque-color">
+            <p class="campo__titulo">Color: <b id="p-color-nombre"></b></p>
+            <div class="colores" id="p-colores" role="radiogroup" aria-label="Color"></div>
+          </div>
           <div class="cantidad">
             <span class="campo__titulo">Cantidad</span>
             <div class="cantidad__ctrl">
@@ -167,7 +177,8 @@
             </div>
           </div>
           <p class="nota" id="p-nota" hidden></p>
-          <button class="btn btn--grande btn--ancho" id="p-agregar" type="button">Agregar a mi carrito</button>
+          <button class="btn btn--grande btn--ancho" id="p-agregar" type="button">Agregar a mi pedido</button>
+          <a class="btn btn--borde btn--ancho" id="p-wa" href="#" target="_blank" rel="noopener" style="margin-top:8px">Preguntar por WhatsApp</a>
         </div>
       </div>
     </dialog>
