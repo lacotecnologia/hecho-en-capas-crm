@@ -9,4 +9,7 @@ export const CONFIG = {
 
   // WhatsApp de la tienda, con indicativo y sin signos (ej. 573001234567). Vacío = no se muestra el botón.
   WHATSAPP: '573116317218',
+
+  // Hoja de Google "Inscritos Academia" (Apps Script publicado como aplicación web). Vacío = el formulario solo abre WhatsApp.
+  ACADEMIA_URL: 'https://script.google.com/macros/s/AKfycbxZo-VoEWNoX1MDC7RcjEu2bUmW1oJCh-iRqKKYMDvOjJVf7npjU05K8lqTJe4xvBs7Bw/exec',
 }

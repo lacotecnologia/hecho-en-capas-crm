@@ -74,9 +74,9 @@
                   <input type="checkbox" name="acepto" required />
                   <span>Autorizo a Hecho en Capas a usar estos datos solo para avisarme de los cursos. Puedo pedir que los borren cuando quiera.</span>
                 </label>
+                <label class="trampa" aria-hidden="true">No llenes este campo<input name="sitio" tabindex="-1" autocomplete="off" /></label>
                 <p class="aviso" id="cupo-error" hidden></p>
-                <button class="btn btn--grande btn--ancho" type="submit">Apartar mi cupo</button>
-                <p class="chico" style="margin:0;text-align:center">Al tocar el botón se abre WhatsApp con tus datos. Solo tienes que enviarlo.</p>
+                <button class="btn btn--grande btn--ancho" type="submit" id="cupo-enviar">Apartar mi cupo</button>
               </form>
             </div>
           </div>
@@ -106,7 +106,9 @@
         return null
       }
 
-      form.addEventListener('submit', (e) => {
+      const boton = document.getElementById('cupo-enviar')
+
+      form.addEventListener('submit', async (e) => {
         e.preventDefault()
         const f = new FormData(form)
         const d = {
@@ -135,14 +137,41 @@
           'Autorizo usar mis datos solo para avisarme de los cursos.',
         ].join('\n')
         const wa = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(texto)}`
-        window.open(wa, '_blank', 'noopener')
+        if (CONFIG.ACADEMIA_URL) {
+          boton.disabled = true
+          boton.textContent = 'Guardando…'
+          try {
+            // Envío simple (sin encabezados especiales) para que Google lo acepte desde otra página.
+            await fetch(CONFIG.ACADEMIA_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              body: new URLSearchParams({
+                nombre: d.nombre,
+                celular: d.celular,
+                correo: d.correo,
+                ciudad: d.ciudad,
+                acepto: 'si',
+                origen: new URLSearchParams(location.search).get('origen') || 'web',
+                sitio: String(f.get('sitio') || ''),
+              }),
+            })
+          } catch {
+            boton.disabled = false
+            boton.textContent = 'Apartar mi cupo'
+            error.textContent = 'No pudimos guardar tus datos. Revisa tu internet y vuelve a intentarlo.'
+            error.hidden = false
+            return
+          }
+        } else {
+          window.open(wa, '_blank', 'noopener')
+        }
         document.getElementById('cupo-contenido').innerHTML = `
           <div class="listo">
             <div class="listo__marca"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg></div>
-            <h2 class="academia__titulo">Ya casi, ${d.nombre.split(' ')[0].replace(/[<>&"]/g, '')}</h2>
-            <p>Se abrió WhatsApp con tus datos. <b>Toca enviar</b> y tu cupo queda apartado. Te escribimos cuando el grupo esté completo.</p>
+            <h2 class="academia__titulo">${CONFIG.ACADEMIA_URL ? '¡Listo' : 'Ya casi'}, ${d.nombre.split(' ')[0].replace(/[<>&"]/g, '')}${CONFIG.ACADEMIA_URL ? '!' : ''}</h2>
+            <p>${CONFIG.ACADEMIA_URL ? 'Tu cupo quedó apartado. Te escribimos al <b>' + d.celular.replace(/[<>&"]/g, '') + '</b> cuando el grupo esté completo, con las fechas, el lugar y el valor.' : 'Se abrió WhatsApp con tus datos. <b>Toca enviar</b> y tu cupo queda apartado.'}</p>
             <div class="portada__botones" style="justify-content:center">
-              <a class="btn" href="${wa}" target="_blank" rel="noopener">Abrir WhatsApp otra vez</a>
+              <a class="btn" href="${wa}" target="_blank" rel="noopener">${CONFIG.ACADEMIA_URL ? 'Escríbenos por WhatsApp' : 'Abrir WhatsApp otra vez'}</a>
               <a class="btn btn--borde" href="/#tienda">Ver la tienda</a>
             </div>
           </div>`
