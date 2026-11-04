@@ -26,6 +26,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagina } from '@/components/layout/pagina'
 import { EstadoPagoBadge } from '@/features/cobros'
+import { HAY_COMISIONES } from '@/features/comisiones/api'
 import { formatoFecha } from '@/features/cotizar/estado'
 import { enlaceWhatsapp } from '@/features/entregas/entrega'
 import { formatoPesos } from '@/features/taller/formato'
@@ -323,6 +324,8 @@ function GananciaComerciales({
         <CardDescription>
           Lo que subió sobre el precio de fábrica en los pedidos del mes. “Lista
           para pagar” es la de los pedidos que el cliente ya pagó completo.
+          {HAY_COMISIONES &&
+            ' “Comisión pagada” es lo que se le pagó en el mes (detalle en Comisiones).'}
         </CardDescription>
       </CardHeader>
       {r.comerciales.length === 0 ? (
@@ -348,6 +351,11 @@ function GananciaComerciales({
                   <th className='px-4 py-2 text-end font-medium'>
                     Lista para pagar
                   </th>
+                  {HAY_COMISIONES && (
+                    <th className='hidden px-4 py-2 text-end font-medium sm:table-cell'>
+                      Comisión pagada
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -366,23 +374,30 @@ function GananciaComerciales({
                     <td className='px-4 py-2.5 text-end font-semibold text-primary tabular-nums'>
                       {formatoPesos(c.gananciaPagada)}
                     </td>
+                    {HAY_COMISIONES && (
+                      <td className='hidden px-4 py-2.5 text-end tabular-nums sm:table-cell'>
+                        {formatoPesos(c.comisionPagada)}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className='border-t px-4 py-3'>
-            <Button
-              variant='ghost'
-              size='sm'
-              className='-ms-2'
-              onClick={() => setVer(!ver)}
-            >
-              {ver
-                ? 'Ocultar el detalle'
-                : `Ver los ${r.pedidos.length} pedidos del mes`}
-            </Button>
-          </div>
+          {r.pedidos.length > 0 && (
+            <div className='border-t px-4 py-3'>
+              <Button
+                variant='ghost'
+                size='sm'
+                className='-ms-2'
+                onClick={() => setVer(!ver)}
+              >
+                {ver
+                  ? 'Ocultar el detalle'
+                  : `Ver los ${r.pedidos.length} pedidos del mes`}
+              </Button>
+            </div>
+          )}
           {ver && (
             <ul className='divide-y border-t'>
               {r.pedidos.map((p) => (

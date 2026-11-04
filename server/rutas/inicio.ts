@@ -1,8 +1,15 @@
-import { and, eq, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { type Pendiente } from '../../shared/inicio.js'
 import { getDb } from '../db/index.js'
-import { cotizaciones, entregas, ordenesProduccion, pedidos, productos } from '../db/schema.js'
+import {
+  cotizaciones,
+  entregas,
+  ordenesProduccion,
+  pagosComision,
+  pedidos,
+  productos,
+} from '../db/schema.js'
 import { conSesion, type Variables } from '../sesion.js'
 
 export const rutasInicio = new Hono<{ Variables: Variables }>()
@@ -109,6 +116,20 @@ rutasInicio.get('/', async (c) => {
         )
       )
     agregar(hoy.n, ['entrega para hoy', 'entregas para hoy'], '/entregas', 'urgente')
+  }
+  if (admin) {
+    const [porPagar] = await db
+      .select({ n: contar })
+      .from(
+        sql`(select comercial_id from comisiones where pago_id is null group by comercial_id having sum(monto) > 0) as saldos`
+      )
+    agregar(porPagar.n, ['comercial tiene comisiones por pagar', 'comerciales tienen comisiones por pagar'], '/comisiones')
+  } else if (r.includes('comercial')) {
+    const [pagados] = await db
+      .select({ n: contar })
+      .from(pagosComision)
+      .where(and(eq(pagosComision.comercialId, u.id), gte(pagosComision.creadoEn, new Date(Date.now() - 7 * 86_400_000))))
+    agregar(pagados.n, ['pago de comisiones recibido esta semana', 'pagos de comisiones recibidos esta semana'], '/comisiones')
   }
   return c.json({ pendientes: lista })
 })

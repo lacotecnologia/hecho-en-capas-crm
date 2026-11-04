@@ -18,6 +18,7 @@ import { Route as AuthenticatedPersonasRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedPapeleraRouteImport } from './routes/_authenticated/papelera'
 import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticated/entregas'
 import { Route as AuthenticatedConfiguracionRouteImport } from './routes/_authenticated/configuracion'
+import { Route as AuthenticatedComisionesRouteImport } from './routes/_authenticated/comisiones'
 import { Route as AuthenticatedColaRouteImport } from './routes/_authenticated/cola'
 import { Route as AuthenticatedCobrosRouteImport } from './routes/_authenticated/cobros'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
@@ -78,6 +79,11 @@ const AuthenticatedConfiguracionRoute =
     path: '/configuracion',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedComisionesRoute = AuthenticatedComisionesRouteImport.update({
+  id: '/comisiones',
+  path: '/comisiones',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedColaRoute = AuthenticatedColaRouteImport.update({
   id: '/cola',
   path: '/cola',
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/cobros': typeof AuthenticatedCobrosRoute
   '/cola': typeof AuthenticatedColaRoute
+  '/comisiones': typeof AuthenticatedComisionesRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
   '/entregas': typeof AuthenticatedEntregasRoute
   '/papelera': typeof AuthenticatedPapeleraRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/cobros': typeof AuthenticatedCobrosRoute
   '/cola': typeof AuthenticatedColaRoute
+  '/comisiones': typeof AuthenticatedComisionesRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
   '/entregas': typeof AuthenticatedEntregasRoute
   '/papelera': typeof AuthenticatedPapeleraRoute
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/cobros': typeof AuthenticatedCobrosRoute
   '/_authenticated/cola': typeof AuthenticatedColaRoute
+  '/_authenticated/comisiones': typeof AuthenticatedComisionesRoute
   '/_authenticated/configuracion': typeof AuthenticatedConfiguracionRoute
   '/_authenticated/entregas': typeof AuthenticatedEntregasRoute
   '/_authenticated/papelera': typeof AuthenticatedPapeleraRoute
@@ -239,6 +248,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/cobros'
     | '/cola'
+    | '/comisiones'
     | '/configuracion'
     | '/entregas'
     | '/papelera'
@@ -262,6 +272,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/cobros'
     | '/cola'
+    | '/comisiones'
     | '/configuracion'
     | '/entregas'
     | '/papelera'
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/cobros'
     | '/_authenticated/cola'
+    | '/_authenticated/comisiones'
     | '/_authenticated/configuracion'
     | '/_authenticated/entregas'
     | '/_authenticated/papelera'
@@ -378,6 +390,13 @@ declare module '@tanstack/react-router' {
       path: '/configuracion'
       fullPath: '/configuracion'
       preLoaderRoute: typeof AuthenticatedConfiguracionRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/comisiones': {
+      id: '/_authenticated/comisiones'
+      path: '/comisiones'
+      fullPath: '/comisiones'
+      preLoaderRoute: typeof AuthenticatedComisionesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/cola': {
@@ -484,6 +503,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCobrosRoute: typeof AuthenticatedCobrosRoute
   AuthenticatedColaRoute: typeof AuthenticatedColaRoute
+  AuthenticatedComisionesRoute: typeof AuthenticatedComisionesRoute
   AuthenticatedConfiguracionRoute: typeof AuthenticatedConfiguracionRoute
   AuthenticatedEntregasRoute: typeof AuthenticatedEntregasRoute
   AuthenticatedPapeleraRoute: typeof AuthenticatedPapeleraRoute
@@ -501,6 +521,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCobrosRoute: AuthenticatedCobrosRoute,
   AuthenticatedColaRoute: AuthenticatedColaRoute,
+  AuthenticatedComisionesRoute: AuthenticatedComisionesRoute,
   AuthenticatedConfiguracionRoute: AuthenticatedConfiguracionRoute,
   AuthenticatedEntregasRoute: AuthenticatedEntregasRoute,
   AuthenticatedPapeleraRoute: AuthenticatedPapeleraRoute,

@@ -9,7 +9,15 @@ import {
   type ReporteMes,
 } from '../../shared/reportes.js'
 import { getDb } from '../db/index.js'
-import { clientes, entregas, pagos, pedidoLineas, pedidos, usuarios } from '../db/schema.js'
+import {
+  clientes,
+  entregas,
+  pagos,
+  pagosComision,
+  pedidoLineas,
+  pedidos,
+  usuarios,
+} from '../db/schema.js'
 import { conSesion, soloRoles, type Variables } from '../sesion.js'
 
 export const rutasReportes = new Hono<{ Variables: Variables }>()
@@ -56,12 +64,43 @@ rutasReportes.get('/', async (c) => {
       ventas: 0,
       ganancia: 0,
       gananciaPagada: 0,
+      comisionPagada: 0,
     }
     k.pedidos++
     k.ventas += p.total
     k.ganancia += p.ganancia
     if (pagado >= p.total) k.gananciaPagada += p.ganancia
     comerciales.set(p.comercialId, k)
+  }
+  // Comisiones pagadas en el mes (aunque el comercial no haya vendido este mes)
+  const pagadas = await db
+    .select({
+      id: pagosComision.comercialId,
+      nombre: usuarios.nombre,
+      total: sql<number>`sum(${pagosComision.total})::int`,
+    })
+    .from(pagosComision)
+    .innerJoin(usuarios, eq(usuarios.id, pagosComision.comercialId))
+    .where(
+      and(
+        gte(pagosComision.creadoEn, desde),
+        lt(pagosComision.creadoEn, hasta),
+        soloMios ? eq(pagosComision.comercialId, u.id) : undefined
+      )
+    )
+    .groupBy(pagosComision.comercialId, usuarios.nombre)
+  for (const x of pagadas) {
+    const k = comerciales.get(x.id) ?? {
+      id: x.id,
+      nombre: x.nombre,
+      pedidos: 0,
+      ventas: 0,
+      ganancia: 0,
+      gananciaPagada: 0,
+      comisionPagada: 0,
+    }
+    k.comisionPagada = x.total
+    comerciales.set(x.id, k)
   }
   const total = delMes.reduce((s, x) => s + x.p.total, 0)
 

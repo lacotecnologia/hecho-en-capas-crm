@@ -14,7 +14,10 @@ const ES_PRUEBA = import.meta.env.VITE_DEMO === '1'
 export async function subirFoto(
   archivo: File,
   destino: {
-    permiso: '/api/pedidos/subida' | '/api/entregas/subida'
+    permiso:
+      | '/api/pedidos/subida'
+      | '/api/entregas/subida'
+      | '/api/comisiones/subida'
     carpeta: string
   }
 ) {

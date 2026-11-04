@@ -538,6 +538,7 @@ export function atenderPedidos(
         ventas: 0,
         ganancia: 0,
         gananciaPagada: 0,
+        comisionPagada: 0,
       }
       k.pedidos++
       k.ventas += p.total

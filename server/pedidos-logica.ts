@@ -11,6 +11,7 @@ import {
   type EstadoPedido,
   puedeProducir,
 } from '../shared/pedidos.js'
+import { anotarComisionGanada, quitarComisionSinPagar } from './comisiones.js'
 import { type getDb } from './db/index.js'
 import {
   clientes,
@@ -146,6 +147,9 @@ export async function recalcularPedido(tx: Tx, pedidoId: number, usuarioId: numb
       .set({ ...cambios, actualizadoEn: new Date() })
       .where(eq(pedidos.id, pedidoId))
   }
+  // La comisión del comercial se gana cuando el pedido queda Cerrado
+  if (estado === 'cerrado') await anotarComisionGanada(tx, p)
+  else if (p.estado === 'cerrado') await quitarComisionSinPagar(tx, pedidoId)
   return estado
 }
 

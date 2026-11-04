@@ -41,6 +41,7 @@ import {
   type Tx,
 } from '../pedidos-logica.js'
 import { conSesion, soloRoles, type UsuarioSesion, type Variables } from '../sesion.js'
+import { aplicarDevolucion } from '../comisiones.js'
 import { moverStock, stockDisponible } from '../stock.js'
 import { permisoDeSubida, SOLO_IMAGENES, urlDeBlobValida } from '../subidas.js'
 
@@ -627,11 +628,13 @@ rutasPedidos.post('/:id/reembolso', soloRoles('admin'), async (c) => {
       usuarioId: u.id,
     })
     // En un pedido que sigue, la devolución es un descuento: baja el total
+    // y la comisión del comercial (o se le descuenta si ya la ganó)
     if (p.estado !== 'cancelado') {
       await tx
         .update(pedidos)
         .set({ total: sql`${pedidos.total} - ${v.datos.monto}`, actualizadoEn: new Date() })
         .where(eq(pedidos.id, p.id))
+      await aplicarDevolucion(tx, p.id, v.datos.monto, u.id)
     }
     await anotar(tx, {
       entidad: 'pedido',

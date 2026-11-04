@@ -15,6 +15,8 @@ export type ReporteMes = {
     ganancia: number
     /** Ganancia de los pedidos que ya están pagados completos: lista para liquidar. */
     gananciaPagada: number
+    /** Comisiones que el administrador le pagó en el mes. */
+    comisionPagada: number
   }[]
   pedidos: {
     id: number

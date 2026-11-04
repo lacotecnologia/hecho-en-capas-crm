@@ -13,6 +13,7 @@ import {
   Layers,
   BarChart3,
   Trash2,
+  HandCoins,
 } from 'lucide-react'
 
 export type ItemMenu = {
@@ -86,6 +87,14 @@ export const MENU: GrupoMenu[] = [
         icono: Wallet,
         descripcion: 'Anticipos, abonos y saldos por cobrar',
         roles: ['admin', 'comercial'],
+      },
+      {
+        titulo: 'Comisiones',
+        url: '/comisiones',
+        icono: HandCoins,
+        descripcion: 'Lo que gana cada comercial y los pagos que se le hacen',
+        roles: ['admin', 'comercial'],
+        ocultarEnPrueba: true,
       },
       {
         titulo: 'Entregas',

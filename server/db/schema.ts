@@ -10,6 +10,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 
 /**
  * Personas que usan el sistema. Se ingresa con usuario + PIN.
@@ -495,6 +496,55 @@ export const historialEstados = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [index('historial_entidad_idx').on(t.entidad, t.entidadId)]
+)
+
+/**
+ * Pagos de comisión al comercial (los registra el administrador).
+ * porFuera = ya se le había pagado antes del sistema: no movió plata.
+ */
+export const pagosComision = pgTable('pagos_comision', {
+  id: serial('id').primaryKey(),
+  comercialId: integer('comercial_id')
+    .notNull()
+    .references(() => usuarios.id),
+  total: integer('total').notNull(),
+  /** efectivo | nequi | daviplata | transferencia | por_fuera */
+  metodo: text('metodo').notNull(),
+  referencia: text('referencia').notNull().default(''),
+  comprobanteUrl: text('comprobante_url'),
+  nota: text('nota').notNull().default(''),
+  porFuera: boolean('por_fuera').notNull().default(false),
+  pagadoPor: integer('pagado_por').references(() => usuarios.id),
+  creadoEn: creadoEn(),
+})
+
+/**
+ * Movimientos de comisión del comercial:
+ * ganada (+, al cerrar el pedido) · descuento (−, por una devolución) ·
+ * ajuste (+ o −, a mano por el administrador). pago_id vacío = por pagar.
+ */
+export const comisiones = pgTable(
+  'comisiones',
+  {
+    id: serial('id').primaryKey(),
+    comercialId: integer('comercial_id')
+      .notNull()
+      .references(() => usuarios.id),
+    pedidoId: integer('pedido_id').references(() => pedidos.id),
+    tipo: text('tipo').notNull(),
+    monto: integer('monto').notNull(),
+    nota: text('nota').notNull().default(''),
+    pagoId: integer('pago_id').references(() => pagosComision.id),
+    creadoPor: integer('creado_por').references(() => usuarios.id),
+    creadoEn: creadoEn(),
+  },
+  (t) => [
+    index('comisiones_comercial_idx').on(t.comercialId),
+    // Un pedido gana su comisión una sola vez
+    uniqueIndex('comisiones_ganada_unica_idx')
+      .on(t.pedidoId)
+      .where(sql`${t.tipo} = 'ganada'`),
+  ]
 )
 
 export type Usuario = typeof usuarios.$inferSelect
