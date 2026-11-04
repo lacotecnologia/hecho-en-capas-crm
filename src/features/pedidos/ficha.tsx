@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ApiError, mensajeDeError } from '@/lib/api'
+import { enPractica, esModoPrueba } from '@/lib/practica'
 import { tieneRol, useSesion } from '@/lib/sesion'
 import { subirFoto } from '@/lib/subir-foto'
 import { cn } from '@/lib/utils'
@@ -271,7 +272,11 @@ function Ficha({ p }: { p: PedidoDetalle }) {
               </div>
               <div className='flex flex-wrap gap-2'>
                 {cobra && (
-                  <Button size='lg' onClick={() => setPagando(true)}>
+                  <Button
+                    size='lg'
+                    data-tour='cobrar'
+                    onClick={() => setPagando(true)}
+                  >
                     <Wallet /> Cobrar anticipo
                   </Button>
                 )}
@@ -492,7 +497,7 @@ function Ficha({ p }: { p: PedidoDetalle }) {
 
           <Card>
             <CardContent className='grid gap-4 pt-6 text-sm'>
-              <div>
+              <div data-tour='fecha-prometida'>
                 <p className='text-muted-foreground'>Fecha prometida</p>
                 {p.fechaCompromiso ? (
                   <p className='font-semibold'>
@@ -1188,20 +1193,18 @@ function FormDevolver({
   )
 }
 
-const ES_PRUEBA = import.meta.env.VITE_DEMO === '1'
-
 /** Código y enlace público para que el cliente vea su pedido sin login. */
 function EnlaceSeguimiento({ p }: { p: PedidoDetalle }) {
   const enlace = `${window.location.origin}/seguimiento/${p.seguimiento}`
   const primerNombre = p.cliente.nombre.split(' ')[0]
   const mensaje = `Hola ${primerNombre}, aquí puedes ver en qué va tu pedido de Hecho en Capas: ${enlace}`
   return (
-    <div className='grid gap-2'>
+    <div className='grid gap-2' data-tour='seguimiento'>
       <span className='justify-self-start rounded-md bg-muted px-2 py-1 font-mono text-base font-semibold tracking-wider'>
         {p.seguimiento}
       </span>
       <div className='flex flex-wrap gap-2'>
-        {p.cliente.whatsapp && !ES_PRUEBA && (
+        {p.cliente.whatsapp && !esModoPrueba() && (
           <Button size='sm' asChild>
             <a
               href={enlaceWhatsapp(p.cliente.whatsapp, mensaje)}
@@ -1212,7 +1215,7 @@ function EnlaceSeguimiento({ p }: { p: PedidoDetalle }) {
             </a>
           </Button>
         )}
-        {!ES_PRUEBA && (
+        {!esModoPrueba() && (
           <Button
             size='sm'
             variant='outline'
@@ -1237,9 +1240,11 @@ function EnlaceSeguimiento({ p }: { p: PedidoDetalle }) {
         </Button>
       </div>
       <p className='text-xs text-muted-foreground'>
-        {ES_PRUEBA
-          ? 'En la versión de prueba no hay enlace para compartir; en el sistema real sí.'
-          : 'El cliente ve los pasos, la fecha y lo que falta por pagar. No ve costos ni notas internas.'}
+        {enPractica()
+          ? 'En la práctica no se comparte. En el sistema real aquí salen “Enviar por WhatsApp” y “Copiar enlace”.'
+          : esModoPrueba()
+            ? 'En la versión de prueba no hay enlace para compartir; en el sistema real sí.'
+            : 'El cliente ve los pasos, la fecha y lo que falta por pagar. No ve costos ni notas internas.'}
       </p>
     </div>
   )

@@ -17,6 +17,7 @@ import {
 import { precioMaximoComercial } from '@shared/costos'
 import { esRol, type Rol } from '@shared/roles'
 import { ApiError } from '@/lib/api'
+import { enPractica } from '@/lib/practica'
 import {
   atenderCotizar,
   cotizarInicial,
@@ -53,7 +54,10 @@ type EstadoDemo = {
   agenda?: Agenda
 }
 
-const CLAVE = 'hec-demo-v8'
+const CLAVE_DEMO = 'hec-demo-v8'
+/** La práctica del comercial guarda su mundo aparte del de la versión de prueba. */
+const CLAVE_PRACTICA = 'hec-practica-mundo-v1'
+const clave = () => (enPractica() ? CLAVE_PRACTICA : CLAVE_DEMO)
 const MAX_INTENTOS = 5
 const MINUTOS_BLOQUEO = 15
 
@@ -184,23 +188,26 @@ function atenderCliente(estado: EstadoDemo) {
   return { cliente: id }
 }
 
-let memoria: EstadoDemo | null = null
+let memoria: { clave: string; estado: EstadoDemo } | null = null
 
 function leer(): EstadoDemo {
-  if (memoria) return memoria
+  const k = clave()
+  if (memoria?.clave === k) return memoria.estado
+  let estado: EstadoDemo
   try {
-    const guardado = localStorage.getItem(CLAVE)
-    memoria = guardado ? (JSON.parse(guardado) as EstadoDemo) : inicial()
+    const guardado = localStorage.getItem(k)
+    estado = guardado ? (JSON.parse(guardado) as EstadoDemo) : inicial()
   } catch {
-    memoria = inicial()
+    estado = inicial()
   }
-  return memoria
+  memoria = { clave: k, estado }
+  return estado
 }
 
 function guardar(estado: EstadoDemo) {
-  memoria = estado
+  memoria = { clave: clave(), estado }
   try {
-    localStorage.setItem(CLAVE, JSON.stringify(estado))
+    localStorage.setItem(clave(), JSON.stringify(estado))
   } catch {
     // Sin almacenamiento (ventana privada): los datos viven mientras la página esté abierta.
   }
@@ -210,9 +217,74 @@ function guardar(estado: EstadoDemo) {
 export function reiniciarDemo() {
   memoria = null
   try {
-    localStorage.removeItem(CLAVE)
+    localStorage.removeItem(CLAVE_DEMO)
   } catch {
     // nada que borrar
+  }
+}
+
+const CAMPOS_PERSONA = new Set([
+  'comercialId',
+  'usuarioId',
+  'operadorId',
+  'mensajeroId',
+])
+
+/**
+ * El comercial de ejemplo toma el número de la persona real (las pantallas
+ * comparan "es mío" con la sesión real); quien ya tuviera ese número se corre.
+ */
+function renumerar(estado: EstadoDemo, usuarioId: number): EstadoDemo {
+  const comercial = estado.personas.find((p) => p.roles.includes('comercial'))!
+  const mapa = new Map<number, number>()
+  if (comercial.id !== usuarioId) {
+    mapa.set(comercial.id, usuarioId)
+    const choca = estado.personas.find((p) => p.id === usuarioId)
+    if (choca) mapa.set(choca.id, 9000 + choca.id)
+  }
+  if (mapa.size === 0) return estado
+  const cambiar = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(cambiar)
+    if (v && typeof v === 'object') {
+      return Object.fromEntries(
+        Object.entries(v).map(([k, x]) => [
+          k,
+          CAMPOS_PERSONA.has(k) && typeof x === 'number'
+            ? (mapa.get(x) ?? x)
+            : cambiar(x),
+        ])
+      )
+    }
+    return v
+  }
+  const nuevo = cambiar(estado) as EstadoDemo
+  for (const p of nuevo.personas) p.id = mapa.get(p.id) ?? p.id
+  return nuevo
+}
+
+/**
+ * Mundo de práctica nuevo para el recorrido del comercial: el comercial de
+ * ejemplo lleva su nombre y ya tiene la sesión abierta. El llavero se puede
+ * pedir con nombre, para practicar los personalizados.
+ */
+export function prepararPractica(nombre: string, usuarioId: number) {
+  const estado = renumerar(inicial(), usuarioId)
+  const comercial = estado.personas.find((p) => p.id === usuarioId)!
+  comercial.nombre = nombre
+  comercial.usuario = 'practica'
+  estado.sesion = comercial.id
+  const llavero = estado.taller.productos.find((p) => p.escogeColor)
+  if (llavero) {
+    llavero.personalizaTexto = true
+    llavero.maxLetras = 12
+    llavero.minPersonalizar = 10
+    llavero.precioPersonalizar = 2000
+  }
+  memoria = { clave: CLAVE_PRACTICA, estado }
+  try {
+    localStorage.setItem(CLAVE_PRACTICA, JSON.stringify(estado))
+  } catch {
+    // Sin almacenamiento: vive mientras la página esté abierta
   }
 }
 
@@ -223,6 +295,8 @@ const publica = (p: PersonaDemo) => ({
   roles: p.roles,
   activo: p.activo,
   bloqueadoHasta: p.bloqueadoHasta,
+  // En la versión de prueba todos ya hicieron la práctica
+  recorridoEn: p.creadoEn,
   creadoEn: p.creadoEn,
 })
 
@@ -504,6 +578,46 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
   }
 
   // ---- Clientes y cotizaciones ----
+  // Mis comisiones (en la práctica): lo ganado con los pedidos de ejemplo
+  if (ruta === '/comisiones/mias' && metodo === 'GET') {
+    const u = yo(estado)
+    const mios = estado.pedidos.pedidos.filter((p) => p.comercialId === u.id)
+    const cliente = (id: number) =>
+      estado.cotizar.clientes.find((c) => c.id === id)?.nombre ?? ''
+    const abiertos = mios.filter(
+      (p) => !['cerrado', 'cancelado'].includes(p.estado) && p.ganancia > 0
+    )
+    const cerrados = mios.filter(
+      (p) => p.estado === 'cerrado' && p.ganancia > 0
+    )
+    const pendientes = cerrados.map((p, i) => ({
+      id: i + 1,
+      tipo: 'ganada' as const,
+      monto: p.ganancia,
+      nota: `Pedido ${p.codigo} cerrado`,
+      pedido: { id: p.id, codigo: p.codigo, cliente: cliente(p.clienteId) },
+      creadoEn: p.actualizadoEn,
+      pagoId: null,
+    }))
+    return {
+      resumen: {
+        comercial: { id: u.id, nombre: u.nombre, activo: true },
+        porGanar: abiertos.reduce((s, p) => s + p.ganancia, 0),
+        porPagar: pendientes.reduce((s, m) => s + m.monto, 0),
+        pagadoMes: 0,
+        pedidosPorGanar: abiertos.map((p) => ({
+          id: p.id,
+          codigo: p.codigo,
+          cliente: cliente(p.clienteId),
+          estado: p.estado,
+          ganancia: p.ganancia,
+        })),
+        pendientes,
+        pagos: [],
+      },
+    }
+  }
+
   if (ruta === '/cotizaciones/taller' && metodo === 'GET') {
     yo(estado)
     return {

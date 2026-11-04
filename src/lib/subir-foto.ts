@@ -1,11 +1,10 @@
 import { ApiError } from '@/lib/api'
+import { esModoPrueba } from '@/lib/practica'
 import {
   comoDataUrl,
   falloDeSubida,
   reducirImagen,
 } from '@/features/taller/subir-archivo'
-
-const ES_PRUEBA = import.meta.env.VITE_DEMO === '1'
 
 /**
  * Sube una foto (comprobante, evidencia de entrega) y devuelve su dirección.
@@ -27,7 +26,8 @@ export async function subirFoto(
       `"${archivo.name}" no es una foto. Sube JPG, PNG o WebP.`
     )
   }
-  if (ES_PRUEBA) return comoDataUrl(await reducirImagen(archivo, 900, 0.75))
+  if (esModoPrueba())
+    return comoDataUrl(await reducirImagen(archivo, 900, 0.75))
   const contenido = await reducirImagen(archivo, 1600, 0.82)
   const { uploadPresigned } = await import('@vercel/blob/client')
   try {

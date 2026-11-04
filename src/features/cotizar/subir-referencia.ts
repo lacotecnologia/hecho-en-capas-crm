@@ -1,4 +1,5 @@
 import { ApiError } from '@/lib/api'
+import { esModoPrueba } from '@/lib/practica'
 import {
   comoDataUrl,
   falloDeSubida,
@@ -7,7 +8,7 @@ import {
 } from '@/features/taller/subir-archivo'
 import { agregarImagen } from './api'
 
-const ES_PRUEBA = import.meta.env.VITE_DEMO === '1'
+
 
 /** Sube una imagen de referencia del cliente y la adjunta a la cotización. */
 export async function subirReferencia(cotizacionId: number, archivo: File) {
@@ -19,7 +20,7 @@ export async function subirReferencia(cotizacionId: number, archivo: File) {
   }
   const base = archivo.name.normalize('NFC').replace(/\.[^.]+$/, '')
   const nombre = `${base}.webp`
-  if (ES_PRUEBA) {
+  if (esModoPrueba()) {
     const url = await comoDataUrl(await reducirImagen(archivo, 700, 0.75))
     return agregarImagen(cotizacionId, { url, nombre })
   }

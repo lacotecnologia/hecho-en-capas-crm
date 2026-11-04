@@ -19,6 +19,7 @@ const columnasPublicas = {
   roles: usuarios.roles,
   activo: usuarios.activo,
   bloqueadoHasta: usuarios.bloqueadoHasta,
+  recorridoEn: usuarios.recorridoEn,
   creadoEn: usuarios.creadoEn,
 }
 
@@ -148,4 +149,16 @@ rutasUsuarios.patch('/:id', async (c) => {
     return c.json({ mensaje: 'No encontramos a esa persona.' }, 404)
   }
   return c.json({ usuario: actualizado })
+})
+
+/** El administrador le pide a alguien que vuelva a hacer el recorrido de práctica. */
+rutasUsuarios.post('/:id/repetir-recorrido', async (c) => {
+  const id = Number(c.req.param('id')) || 0
+  const [fila] = await getDb()
+    .update(usuarios)
+    .set({ recorridoEn: null, actualizadoEn: new Date() })
+    .where(eq(usuarios.id, id))
+    .returning(columnasPublicas)
+  if (!fila) return c.json({ mensaje: 'No encontramos a esa persona.' }, 404)
+  return c.json({ usuario: fila })
 })

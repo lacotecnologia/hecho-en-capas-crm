@@ -43,6 +43,7 @@ export function TarjetaEntrega({
   return (
     <section
       aria-label='Cuándo se entrega'
+      data-tour='cuando'
       className='grid gap-2 rounded-xl border-2 border-primary/30 bg-accent/40 p-4'
     >
       <p className='flex items-center gap-2 text-sm font-medium text-muted-foreground'>

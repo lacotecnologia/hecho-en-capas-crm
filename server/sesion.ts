@@ -11,7 +11,13 @@ export type UsuarioSesion = {
   nombre: string
   usuario: string
   roles: Rol[]
+  /** Comercial que aún no hace el recorrido de práctica: no puede usar nada más. */
+  recorridoPendiente: boolean
 }
+
+/** El recorrido es obligatorio para quien vende y no es administrador. */
+export const debeHacerRecorrido = (roles: string[], recorridoEn: Date | null) =>
+  roles.includes('comercial') && !roles.includes('admin') && recorridoEn === null
 
 export type Variables = { usuario: UsuarioSesion }
 
@@ -29,6 +35,7 @@ export const conSesion = createMiddleware<{ Variables: Variables }>(
         usuario: usuarios.usuario,
         roles: usuarios.roles,
         activo: usuarios.activo,
+        recorridoEn: usuarios.recorridoEn,
       })
       .from(usuarios)
       .where(eq(usuarios.id, id))
@@ -37,11 +44,20 @@ export const conSesion = createMiddleware<{ Variables: Variables }>(
     if (!fila || !fila.activo) {
       return c.json({ mensaje: 'Tu sesión terminó. Ingresa de nuevo.' }, 401)
     }
+    const recorridoPendiente = debeHacerRecorrido(fila.roles, fila.recorridoEn)
+    // Hasta terminar el recorrido de práctica solo puede usar su sesión
+    if (recorridoPendiente && !c.req.path.includes('/auth/')) {
+      return c.json(
+        { mensaje: 'Primero haz el recorrido de práctica. Ve a Inicio para empezarlo.' },
+        403
+      )
+    }
     c.set('usuario', {
       id: fila.id,
       nombre: fila.nombre,
       usuario: fila.usuario,
       roles: fila.roles as Rol[],
+      recorridoPendiente,
     })
     await next()
   }

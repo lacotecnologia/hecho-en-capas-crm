@@ -102,6 +102,18 @@ const listaNombres = (t: string) =>
 
 type CargoForm = { concepto: string; valor: string }
 
+/** Cotización nueva que pidió el PDF: se abre cuando cargue con su número. */
+let pdfAlCargar: number | null = null
+const pedirPdfAlCargar = (id: number) => {
+  pdfAlCargar = id
+}
+/** true (una sola vez) si esta cotización debe abrir el PDF al cargar. */
+const tomarPdfAlCargar = (id: number) => {
+  const si = pdfAlCargar === id
+  if (si) pdfAlCargar = null
+  return si
+}
+
 export function Volver() {
   return (
     <Button variant='ghost' asChild className='-ms-3 mb-2'>
@@ -162,7 +174,12 @@ export function EditorCotizacion({
   } | null>(null)
   const [eligiendo, setEligiendo] = useState(false)
   const [pidiendo, setPidiendo] = useState(false)
-  const [pdf, setPdf] = useState<CotizacionDetalle | null>(null)
+  // Si se pidió el PDF al guardar una nueva, la pantalla se recarga con su
+  // número: el PDF se abre al llegar
+  const quierePdf = useRef(false)
+  const [pdf, setPdf] = useState<CotizacionDetalle | null>(() => {
+    return cotizacion && tomarPdfAlCargar(cotizacion.id) ? cotizacion : null
+  })
   const [borrando, setBorrando] = useState(false)
   const [sucio, setSucio] = useState(false)
   const errorDe = (c: string) =>
@@ -256,6 +273,7 @@ export function EditorCotizacion({
       setSucio(false)
       setError(null)
       if (!cotizacion) {
+        if (quierePdf.current) pedirPdfAlCargar(c.id)
         navigate({
           to: '/cotizar/$id',
           params: { id: String(c.id) },
@@ -264,12 +282,14 @@ export function EditorCotizacion({
       }
       return c
     },
-    onError: (e) =>
+    onError: (e) => {
+      quierePdf.current = false
       setError(
         e instanceof ApiError
           ? { mensaje: e.message, campo: e.campo }
           : { mensaje: 'No se pudo guardar. Intenta de nuevo.' }
-      ),
+      )
+    },
   })
 
   /** Guarda si hace falta y devuelve la cotización al día. */
@@ -421,6 +441,7 @@ export function EditorCotizacion({
                 return (
                   <div
                     key={`${l.productoId}-${l.bobinaId ?? 'sin'}-${i}`}
+                    data-tour='linea'
                     className='grid gap-3 rounded-xl border p-3 sm:grid-cols-[64px_1fr]'
                   >
                     <div className='hidden size-16 overflow-hidden rounded-lg bg-muted sm:block'>
@@ -446,6 +467,7 @@ export function EditorCotizacion({
                           </p>
                           {disp && (
                             <p
+                              data-tour='disponibilidad'
                               className={cn(
                                 'mt-1 inline-flex rounded-md px-2 py-0.5 text-xs font-medium',
                                 disp.tono === 'listo'
@@ -475,7 +497,10 @@ export function EditorCotizacion({
                           <span className='text-sm font-medium'>
                             Color{' '}
                             {!l.bobinaId && (
-                              <span className='font-normal text-marca-naranja'>
+                              <span
+                                data-tour='falta-color'
+                                className='font-normal text-marca-naranja'
+                              >
                                 · falta escogerlo
                               </span>
                             )}
@@ -503,7 +528,10 @@ export function EditorCotizacion({
                         </div>
                       )}
                       {pers?.activa && (
-                        <div className='grid gap-2 rounded-lg bg-muted/50 p-3'>
+                        <div
+                          data-tour='nombres'
+                          className='grid gap-2 rounded-lg bg-muted/50 p-3'
+                        >
                           <label className='flex items-center gap-3 text-sm font-medium'>
                             <Switch
                               checked={l.personaliza}
@@ -638,6 +666,7 @@ export function EditorCotizacion({
                 <Button
                   type='button'
                   variant='outline'
+                  data-tour='agregar-producto'
                   onClick={() => setEligiendo(true)}
                 >
                   <Plus /> Agregar producto
@@ -762,6 +791,7 @@ export function EditorCotizacion({
               className='grid gap-2 sm:grid-cols-3'
               role='radiogroup'
               aria-label='Forma de entrega'
+              data-tour='entrega'
             >
               {MODALIDADES.map((m) => {
                 const frase = entrega.porModalidad
@@ -938,14 +968,16 @@ export function EditorCotizacion({
             onClick={async () => {
               setError(null)
               try {
+                quierePdf.current = true
                 const c = await asegurarGuardada()
-                setPdf(c)
+                if (cotizacion) setPdf(c)
               } catch {
                 // el error ya se muestra en la barra
               }
             }}
           >
-            <FileDown /> Ver PDF y enviar
+            <FileDown />
+            <span data-tour='ver-pdf'>Ver PDF y enviar</span>
           </Button>
         </div>
       </form>

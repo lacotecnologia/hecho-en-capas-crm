@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ROLES_INFO } from '@shared/roles'
 import {
+  GraduationCap,
   KeyRound,
   Lock,
   MoreVertical,
@@ -10,6 +11,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { mensajeDeError } from '@/lib/api'
 import { useSesion } from '@/lib/sesion'
 import { iniciales } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -30,7 +32,9 @@ import {
   actualizarPersona,
   consultaPersonas,
   estaBloqueada,
+  haceRecorrido,
   type Persona,
+  repetirRecorrido,
 } from './api'
 import { DialogoPersona } from './dialogo-persona'
 import { DialogoPin } from './dialogo-pin'
@@ -123,6 +127,16 @@ export function Personas() {
                       <Lock /> Bloqueada
                     </Badge>
                   )}
+                  {haceRecorrido(persona) &&
+                    (persona.recorridoEn ? (
+                      <Badge variant='outline'>
+                        <GraduationCap /> Hizo la práctica
+                      </Badge>
+                    ) : (
+                      <Badge className='bg-marca-amarillo/40 text-foreground'>
+                        <GraduationCap /> Falta la práctica
+                      </Badge>
+                    ))}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -146,6 +160,25 @@ export function Personas() {
                     <DropdownMenuItem onClick={() => setCambiandoPin(persona)}>
                       <KeyRound /> Cambiar PIN
                     </DropdownMenuItem>
+                    {haceRecorrido(persona) && persona.recorridoEn && (
+                      <DropdownMenuItem
+                        onClick={async () => {
+                          try {
+                            await repetirRecorrido(persona.id)
+                            queryClient.invalidateQueries({
+                              queryKey: ['personas'],
+                            })
+                            toast.success(
+                              `La próxima vez que entre, ${persona.nombre.split(' ')[0]} tendrá que hacer la práctica de nuevo.`
+                            )
+                          } catch (e) {
+                            toast.error(mensajeDeError(e))
+                          }
+                        }}
+                      >
+                        <GraduationCap /> Pedir que repita la práctica
+                      </DropdownMenuItem>
+                    )}
                     {bloqueada && (
                       <DropdownMenuItem
                         onClick={() =>

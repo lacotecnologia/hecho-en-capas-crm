@@ -14,6 +14,7 @@ import {
   BarChart3,
   Trash2,
   HandCoins,
+  BookOpen,
 } from 'lucide-react'
 
 export type ItemMenu = {
@@ -108,6 +109,18 @@ export const MENU: GrupoMenu[] = [
         url: '/reportes',
         icono: BarChart3,
         descripcion: 'Ventas, ganancia de cada comercial y lo que falta cobrar',
+        roles: ['admin', 'comercial'],
+      },
+    ],
+  },
+  {
+    titulo: 'Ayuda',
+    items: [
+      {
+        titulo: 'Manual',
+        url: '/manual',
+        icono: BookOpen,
+        descripcion: 'El proceso de venta paso a paso, con fotos',
         roles: ['admin', 'comercial'],
       },
     ],

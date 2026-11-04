@@ -2,6 +2,7 @@
  * Clientes y cotizaciones en la versión de prueba: imita /api/clientes y
  * /api/cotizaciones en el navegador con las mismas reglas del servidor.
  */
+import { agendaPorDefecto } from '@shared/agenda'
 import { type ValoresConfig } from '@shared/configuracion'
 import {
   type Cargo,
@@ -22,6 +23,7 @@ import {
   validarTextosCotizacion,
   fabricaDeLinea,
 } from '@shared/cotizacion'
+import { calcularPromesa, claveExistencia } from '@shared/promesa'
 import { type Rol } from '@shared/roles'
 import { skuDe } from '@shared/taller'
 import { ApiError } from '@/lib/api'
@@ -204,6 +206,63 @@ export function atenderCotizar(
     return r
   }
 
+  /** Hora de entrega de la cotización, con el taller de ejemplo. */
+  const promesaDe = (cot: CotizacionDemo): CotizacionDetalle['promesa'] => {
+    if (cot.lineas.length === 0) return null
+    const desde = new Date(cot.enviadaEn ?? cot.actualizadaEn)
+    const existencias: Record<string, number> = {}
+    const lineas = cot.lineas.flatMap((l, i) => {
+      const p = taller.productos.find((x) => x.id === l.productoId)
+      if (!p) return []
+      const bobina = p.escogeColor ? (l.bobinaId ?? null) : null
+      const clave = claveExistencia(p.id, bobina)
+      existencias[clave] = stockDisponibleDemo(taller, p.id, bobina)
+      const conNombre = (l.textos ?? []).length > 0
+      return [
+        {
+          clave: String(i),
+          nombre: p.nombre,
+          cantidad: l.cantidad,
+          claveExistencia: clave,
+          horasPorUnidad: p.horas,
+          unidadesPorCama: p.unidadesPorCama,
+          minPreparacion: p.minPreparacion,
+          minAcabado: p.minPostproceso,
+          multicolor: p.multicolor,
+          usaExistencias: !conNombre,
+          minDiseno: conNombre ? (p.minPersonalizar ?? 0) * l.cantidad : 0,
+        },
+      ]
+    })
+    const r = calcularPromesa({
+      desde,
+      lineas,
+      modalidad: cot.modalidad,
+      agenda: agendaPorDefecto(),
+      taller: {
+        impresoras: taller.impresoras
+          .filter((x) => x.activa)
+          .map((x) => ({
+            id: x.id,
+            nombre: x.nombre,
+            multicolor: x.multicolor,
+            libreEn: null,
+          })),
+        cola: [],
+      },
+      existencias,
+    })
+    if (!r.ok) return null
+    return {
+      calculadaEn: desde.toISOString(),
+      listoEn: r.listoEn,
+      entregaEn: r.entregaEn,
+      frase: r.frase,
+      validaHasta: r.validaHasta,
+      pasos: r.pasos,
+    }
+  }
+
   const detalle = (cot: CotizacionDemo): CotizacionDetalle => {
     const resumen = resumenDe(cot)
     const ocultar = !verGanancia
@@ -234,7 +293,7 @@ export function atenderCotizar(
       reemplazadaPor:
         d.cotizaciones.find((x) => x.reemplazaId === cot.id)?.id ?? null,
       pedido: pedidoDe(cot.id),
-      promesa: null,
+      promesa: promesaDe(cot),
     }
   }
 

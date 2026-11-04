@@ -77,7 +77,11 @@ export function ConvertirEnPedido({
   const personalizados = c.lineas.filter((l) => l.personalizado)
   return (
     <>
-      <Button size='lg' onClick={() => setAbierto(true)}>
+      <Button
+        size='lg'
+        data-tour='convertir'
+        onClick={() => setAbierto(true)}
+      >
         <ClipboardList /> Convertir en pedido
       </Button>
       <Dialog open={abierto} onOpenChange={setAbierto}>

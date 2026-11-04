@@ -57,7 +57,7 @@ export function ListaCotizaciones() {
       descripcion='Arma cotizaciones, descarga el PDF y sigue la respuesta de cada cliente.'
       acciones={
         puedeCrear && (
-          <Button asChild size='lg'>
+          <Button asChild size='lg' data-tour='nueva-cotizacion'>
             <Link to='/cotizar/$id' params={{ id: 'nueva' }}>
               <Plus /> Nueva cotización
             </Link>

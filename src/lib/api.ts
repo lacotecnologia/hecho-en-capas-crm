@@ -1,3 +1,5 @@
+import { enPractica } from './practica'
+
 /**
  * Llamadas a la API propia (/api/...). La sesión viaja en una cookie
  * httpOnly, así que aquí no se maneja ningún token.
@@ -22,7 +24,11 @@ export async function api<T>(
   ruta: string,
   opciones: Opciones = {}
 ): Promise<T> {
-  if (import.meta.env.VITE_DEMO === '1') {
+  // Versión de prueba, o práctica del comercial (la sesión sigue siendo real)
+  if (
+    import.meta.env.VITE_DEMO === '1' ||
+    (enPractica() && !ruta.startsWith('/auth/'))
+  ) {
     const { apiDemo } = await import('@/demo/api-demo')
     return apiDemo<T>(
       ruta,

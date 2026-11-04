@@ -360,6 +360,7 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
             {puedeDecidir && c.estado === 'enviada' && (
               <Button
                 size='lg'
+                data-tour='aprobar'
                 disabled={accion.isPending}
                 onClick={() => accion.mutate({ tipo: 'aprobar' })}
               >

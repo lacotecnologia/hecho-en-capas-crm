@@ -47,7 +47,10 @@ export function SelectorCliente({
 
   if (cliente) {
     return (
-      <div className='flex flex-wrap items-start gap-3 rounded-lg border bg-accent/40 p-4'>
+      <div
+        data-tour='cliente-elegido'
+        className='flex flex-wrap items-start gap-3 rounded-lg border bg-accent/40 p-4'
+      >
         <div className='min-w-0 flex-1'>
           <p className='font-semibold'>{cliente.nombre}</p>
           <p className='flex flex-wrap gap-x-4 text-sm text-muted-foreground'>
@@ -89,7 +92,7 @@ export function SelectorCliente({
   }
 
   return (
-    <div className='grid gap-3'>
+    <div className='grid gap-3' data-tour='cliente'>
       <div className='relative'>
         <Search className='pointer-events-none absolute inset-s-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground' />
         <Input

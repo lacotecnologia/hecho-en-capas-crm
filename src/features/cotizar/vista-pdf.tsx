@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { type CotizacionDetalle } from '@shared/cotizacion'
 import { CheckCircle2, Download, Loader2 } from 'lucide-react'
+import { enPractica, esModoPrueba } from '@/lib/practica'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,8 +13,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { consultaTextosNegocio } from '@/features/configuracion/api'
-
-const ES_PRUEBA = import.meta.env.VITE_DEMO === '1'
 
 /** Dibuja cada página del PDF en un canvas (se ve igual en celular y computador). */
 async function dibujarPaginas(blob: Blob, contenedor: HTMLDivElement) {
@@ -124,9 +123,11 @@ export function VistaPdf({
           <div ref={contenedor} className='grid gap-4' />
         </div>
         <DialogFooter className='flex-wrap gap-2'>
-          {ES_PRUEBA ? (
+          {esModoPrueba() ? (
             <p className='me-auto self-center text-sm text-muted-foreground'>
-              En la versión de prueba no se descarga; en el sistema real sí.
+              {enPractica()
+                ? 'En la práctica no se descarga. En el sistema real aquí lo descargas o lo compartes por WhatsApp.'
+                : 'En la versión de prueba no se descarga; en el sistema real sí.'}
             </p>
           ) : (
             <Button variant='outline' asChild disabled={!url}>
@@ -139,7 +140,11 @@ export function VistaPdf({
             </Button>
           )}
           {onMarcarEnviada && (
-            <Button onClick={onMarcarEnviada} disabled={!url || marcando}>
+            <Button
+              data-tour='ya-envie'
+              onClick={onMarcarEnviada}
+              disabled={!url || marcando}
+            >
               {marcando ? (
                 <Loader2 className='animate-spin' />
               ) : (

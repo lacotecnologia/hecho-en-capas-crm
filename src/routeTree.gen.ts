@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as BienvenidaRouteImport } from './routes/bienvenida'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as SeguimientoIndexRouteImport } from './routes/seguimiento/index'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
@@ -16,6 +17,7 @@ import { Route as SeguimientoCodigoRouteImport } from './routes/seguimiento/$cod
 import { Route as AuthenticatedReportesRouteImport } from './routes/_authenticated/reportes'
 import { Route as AuthenticatedPersonasRouteImport } from './routes/_authenticated/personas'
 import { Route as AuthenticatedPapeleraRouteImport } from './routes/_authenticated/papelera'
+import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated/manual'
 import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticated/entregas'
 import { Route as AuthenticatedConfiguracionRouteImport } from './routes/_authenticated/configuracion'
 import { Route as AuthenticatedComisionesRouteImport } from './routes/_authenticated/comisiones'
@@ -34,6 +36,11 @@ import { Route as AuthenticatedPedidosIdRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCotizarIdRouteImport } from './routes/_authenticated/cotizar/$id'
 import { Route as AuthenticatedTallerProductosIdRouteImport } from './routes/_authenticated/taller/productos/$id'
 
+const BienvenidaRoute = BienvenidaRouteImport.update({
+  id: '/bienvenida',
+  path: '/bienvenida',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -66,6 +73,11 @@ const AuthenticatedPersonasRoute = AuthenticatedPersonasRouteImport.update({
 const AuthenticatedPapeleraRoute = AuthenticatedPapeleraRouteImport.update({
   id: '/papelera',
   path: '/papelera',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedManualRoute = AuthenticatedManualRouteImport.update({
+  id: '/manual',
+  path: '/manual',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedEntregasRoute = AuthenticatedEntregasRouteImport.update({
@@ -161,6 +173,7 @@ const AuthenticatedTallerProductosIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
+  '/bienvenida': typeof BienvenidaRoute
   '/ingresar': typeof authIngresarRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
@@ -172,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/comisiones': typeof AuthenticatedComisionesRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
   '/entregas': typeof AuthenticatedEntregasRoute
+  '/manual': typeof AuthenticatedManualRoute
   '/papelera': typeof AuthenticatedPapeleraRoute
   '/personas': typeof AuthenticatedPersonasRoute
   '/reportes': typeof AuthenticatedReportesRoute
@@ -185,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/taller/productos/$id': typeof AuthenticatedTallerProductosIdRoute
 }
 export interface FileRoutesByTo {
+  '/bienvenida': typeof BienvenidaRoute
   '/ingresar': typeof authIngresarRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
@@ -196,6 +211,7 @@ export interface FileRoutesByTo {
   '/comisiones': typeof AuthenticatedComisionesRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
   '/entregas': typeof AuthenticatedEntregasRoute
+  '/manual': typeof AuthenticatedManualRoute
   '/papelera': typeof AuthenticatedPapeleraRoute
   '/personas': typeof AuthenticatedPersonasRoute
   '/reportes': typeof AuthenticatedReportesRoute
@@ -212,6 +228,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/bienvenida': typeof BienvenidaRoute
   '/(auth)/ingresar': typeof authIngresarRoute
   '/(errors)/401': typeof errors401Route
   '/(errors)/403': typeof errors403Route
@@ -223,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated/comisiones': typeof AuthenticatedComisionesRoute
   '/_authenticated/configuracion': typeof AuthenticatedConfiguracionRoute
   '/_authenticated/entregas': typeof AuthenticatedEntregasRoute
+  '/_authenticated/manual': typeof AuthenticatedManualRoute
   '/_authenticated/papelera': typeof AuthenticatedPapeleraRoute
   '/_authenticated/personas': typeof AuthenticatedPersonasRoute
   '/_authenticated/reportes': typeof AuthenticatedReportesRoute
@@ -240,6 +258,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/bienvenida'
     | '/ingresar'
     | '/401'
     | '/403'
@@ -251,6 +270,7 @@ export interface FileRouteTypes {
     | '/comisiones'
     | '/configuracion'
     | '/entregas'
+    | '/manual'
     | '/papelera'
     | '/personas'
     | '/reportes'
@@ -264,6 +284,7 @@ export interface FileRouteTypes {
     | '/taller/productos/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/bienvenida'
     | '/ingresar'
     | '/401'
     | '/403'
@@ -275,6 +296,7 @@ export interface FileRouteTypes {
     | '/comisiones'
     | '/configuracion'
     | '/entregas'
+    | '/manual'
     | '/papelera'
     | '/personas'
     | '/reportes'
@@ -290,6 +312,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
+    | '/bienvenida'
     | '/(auth)/ingresar'
     | '/(errors)/401'
     | '/(errors)/403'
@@ -301,6 +324,7 @@ export interface FileRouteTypes {
     | '/_authenticated/comisiones'
     | '/_authenticated/configuracion'
     | '/_authenticated/entregas'
+    | '/_authenticated/manual'
     | '/_authenticated/papelera'
     | '/_authenticated/personas'
     | '/_authenticated/reportes'
@@ -317,6 +341,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  BienvenidaRoute: typeof BienvenidaRoute
   authIngresarRoute: typeof authIngresarRoute
   errors401Route: typeof errors401Route
   errors403Route: typeof errors403Route
@@ -329,6 +354,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/bienvenida': {
+      id: '/bienvenida'
+      path: '/bienvenida'
+      fullPath: '/bienvenida'
+      preLoaderRoute: typeof BienvenidaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -376,6 +408,13 @@ declare module '@tanstack/react-router' {
       path: '/papelera'
       fullPath: '/papelera'
       preLoaderRoute: typeof AuthenticatedPapeleraRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/manual': {
+      id: '/_authenticated/manual'
+      path: '/manual'
+      fullPath: '/manual'
+      preLoaderRoute: typeof AuthenticatedManualRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/entregas': {
@@ -506,6 +545,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedComisionesRoute: typeof AuthenticatedComisionesRoute
   AuthenticatedConfiguracionRoute: typeof AuthenticatedConfiguracionRoute
   AuthenticatedEntregasRoute: typeof AuthenticatedEntregasRoute
+  AuthenticatedManualRoute: typeof AuthenticatedManualRoute
   AuthenticatedPapeleraRoute: typeof AuthenticatedPapeleraRoute
   AuthenticatedPersonasRoute: typeof AuthenticatedPersonasRoute
   AuthenticatedReportesRoute: typeof AuthenticatedReportesRoute
@@ -524,6 +564,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedComisionesRoute: AuthenticatedComisionesRoute,
   AuthenticatedConfiguracionRoute: AuthenticatedConfiguracionRoute,
   AuthenticatedEntregasRoute: AuthenticatedEntregasRoute,
+  AuthenticatedManualRoute: AuthenticatedManualRoute,
   AuthenticatedPapeleraRoute: AuthenticatedPapeleraRoute,
   AuthenticatedPersonasRoute: AuthenticatedPersonasRoute,
   AuthenticatedReportesRoute: AuthenticatedReportesRoute,
@@ -541,6 +582,7 @@ const AuthenticatedRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  BienvenidaRoute: BienvenidaRoute,
   authIngresarRoute: authIngresarRoute,
   errors401Route: errors401Route,
   errors403Route: errors403Route,

@@ -276,7 +276,7 @@ function MisComisiones() {
   if (isLoading || !r) return <Cargando />
   return (
     <div className='grid gap-6'>
-      <div className='grid gap-3 sm:grid-cols-3'>
+      <div className='grid gap-3 sm:grid-cols-3' data-tour='mis-cifras'>
         <Cifra
           titulo='Por cobrar'
           valor={r.porPagar}

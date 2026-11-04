@@ -15,7 +15,7 @@ import {
 } from '../auth.js'
 import { getDb } from '../db/index.js'
 import { usuarios } from '../db/schema.js'
-import { conSesion, type Variables } from '../sesion.js'
+import { conSesion, debeHacerRecorrido, type Variables } from '../sesion.js'
 
 export const rutasAuth = new Hono<{ Variables: Variables }>()
 
@@ -132,6 +132,7 @@ rutasAuth.post('/primer-ingreso', async (c) => {
         nombre: creado.nombre,
         usuario: creado.usuario,
         roles: creado.roles,
+        recorridoPendiente: false,
       },
     },
     201
@@ -227,6 +228,7 @@ rutasAuth.post('/ingresar', async (c) => {
       nombre: persona.nombre,
       usuario: persona.usuario,
       roles: persona.roles,
+      recorridoPendiente: debeHacerRecorrido(persona.roles, persona.recorridoEn),
     },
   })
 })
@@ -237,3 +239,13 @@ rutasAuth.post('/salir', (c) => {
 })
 
 rutasAuth.get('/yo', conSesion, (c) => c.json({ usuario: c.get('usuario') }))
+
+/** Terminó el recorrido de práctica: ya puede usar el sistema. */
+rutasAuth.post('/recorrido', conSesion, async (c) => {
+  const u = c.get('usuario')
+  await getDb()
+    .update(usuarios)
+    .set({ recorridoEn: new Date(), actualizadoEn: new Date() })
+    .where(eq(usuarios.id, u.id))
+  return c.json({ usuario: { ...u, recorridoPendiente: false } })
+})

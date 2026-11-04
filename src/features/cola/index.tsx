@@ -152,7 +152,11 @@ export function ColaImpresion() {
           </section>
 
           {/* Tablero */}
-          <section aria-label='Tablero de órdenes' className='grid gap-3'>
+          <section
+            aria-label='Tablero de órdenes'
+            data-tour='tablero'
+            className='grid gap-3'
+          >
             <div
               className='flex gap-2 lg:hidden'
               role='tablist'

@@ -25,6 +25,8 @@ export const usuarios = pgTable('usuarios', {
   activo: boolean('activo').notNull().default(true),
   intentosFallidos: integer('intentos_fallidos').notNull().default(0),
   bloqueadoHasta: timestamp('bloqueado_hasta', { withTimezone: true }),
+  /** Cuándo terminó el recorrido de práctica (null = aún no; el comercial lo debe hacer). */
+  recorridoEn: timestamp('recorrido_en', { withTimezone: true }),
   creadoEn: timestamp('creado_en', { withTimezone: true })
     .notNull()
     .defaultNow(),

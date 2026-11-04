@@ -9,7 +9,19 @@ export type Persona = {
   roles: Rol[]
   activo: boolean
   bloqueadoHasta: string | null
+  /** Cuándo terminó el recorrido de práctica (null = aún no). */
+  recorridoEn: string | null
   creadoEn: string
+}
+
+/** Quien vende (y no es administrador) debe hacer el recorrido. */
+export const haceRecorrido = (p: Persona) =>
+  p.roles.includes('comercial') && !p.roles.includes('admin')
+
+export function repetirRecorrido(id: number) {
+  return api<{ usuario: Persona }>(`/usuarios/${id}/repetir-recorrido`, {
+    method: 'POST',
+  })
 }
 
 export const consultaPersonas = queryOptions({

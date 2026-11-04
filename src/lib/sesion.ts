@@ -7,6 +7,8 @@ export type UsuarioSesion = {
   nombre: string
   usuario: string
   roles: Rol[]
+  /** Comercial que aún no hace el recorrido de práctica. */
+  recorridoPendiente?: boolean
 }
 
 export const consultaSesion = queryOptions({

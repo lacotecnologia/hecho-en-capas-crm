@@ -1,4 +1,5 @@
 import { FlaskConical, RotateCcw } from 'lucide-react'
+import { usePractica } from '@/lib/practica'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -66,6 +67,16 @@ export function AvisoPruebaIngreso({
 
 /** Etiqueta pequeña en el encabezado de cada pantalla. */
 export function EtiquetaPrueba() {
+  const practica = usePractica()
+  if (practica) {
+    return (
+      <span className='inline-flex items-center gap-1.5 rounded-full bg-marca-amarillo/40 px-3 py-1 text-xs font-semibold'>
+        <FlaskConical className='size-3.5' />
+        <span className='sm:hidden'>Práctica</span>
+        <span className='hidden sm:inline'>Práctica: nada es real</span>
+      </span>
+    )
+  }
   if (!ES_PRUEBA) return null
   return (
     <span className='hidden items-center gap-1.5 rounded-full bg-marca-amarillo/30 px-3 py-1 text-xs font-medium sm:inline-flex'>

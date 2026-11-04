@@ -1,8 +1,9 @@
 import { type TipoArchivo } from '@shared/taller'
+import { esModoPrueba } from '@/lib/practica'
 import { ApiError } from '@/lib/api'
 import { registrarArchivo } from './api'
 
-const ES_PRUEBA = import.meta.env.VITE_DEMO === '1'
+
 
 export function tipoDeArchivo(
   nombre: string,
@@ -84,7 +85,7 @@ export async function subirArchivo(productoId: number, archivo: File) {
   }
   const nombreBase = archivo.name.normalize('NFC').replace(/\.[^.]+$/, '')
 
-  if (ES_PRUEBA) {
+  if (esModoPrueba()) {
     const url =
       tipo === 'imagen'
         ? await comoDataUrl(await reducirImagen(archivo, 700, 0.75))
