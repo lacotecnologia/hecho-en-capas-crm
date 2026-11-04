@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import {
   CAMPOS_CONFIG,
   GRUPOS_CONFIG,
@@ -21,8 +22,10 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Pagina } from '@/components/layout/pagina'
+import { AgendaEntregas } from './agenda'
 import {
   type ConfiguracionCompleta,
   consultaConfiguracionCompleta,
@@ -41,6 +44,41 @@ const DESCRIPCION_GRUPO: Record<GrupoConfig, string> = {
 const formato = new Intl.NumberFormat('es-CO')
 
 export function Configuracion() {
+  const { pestana = 'valores' } = useSearch({
+    from: '/_authenticated/configuracion',
+  })
+  const navigate = useNavigate({ from: '/configuracion' })
+  return (
+    <Pagina
+      titulo='Configuración'
+      descripcion='Valores del negocio. Los cambios aplican a lo nuevo; lo ya cotizado no cambia.'
+    >
+      <Tabs
+        value={pestana}
+        onValueChange={(v) =>
+          navigate({
+            search: { pestana: v as 'valores' | 'entregas' },
+            replace: true,
+          })
+        }
+        className='gap-4'
+      >
+        <TabsList>
+          <TabsTrigger value='valores'>Valores del negocio</TabsTrigger>
+          <TabsTrigger value='entregas'>Horarios y entregas</TabsTrigger>
+        </TabsList>
+        <TabsContent value='valores'>
+          <ValoresNegocio />
+        </TabsContent>
+        <TabsContent value='entregas'>
+          <AgendaEntregas />
+        </TabsContent>
+      </Tabs>
+    </Pagina>
+  )
+}
+
+function ValoresNegocio() {
   const queryClient = useQueryClient()
   const { data: completo, isLoading } = useQuery(consultaConfiguracionCompleta)
   const guardados = completo?.valores
@@ -119,13 +157,13 @@ export function Configuracion() {
 
   const totalCambios = cambiados.length + textosCambiados.length
   const hayErrores = Object.keys(errores).length > 0
-  const grupos = Object.keys(GRUPOS_CONFIG) as GrupoConfig[]
+  // Los días de envío ya no se usan: la entrega sale de Horarios y entregas
+  const grupos = (Object.keys(GRUPOS_CONFIG) as GrupoConfig[]).filter(
+    (g) => g !== 'envios'
+  )
 
   return (
-    <Pagina
-      titulo='Configuración'
-      descripcion='Valores del negocio. Los cambios aplican a lo nuevo; lo ya cotizado no cambia.'
-    >
+    <>
       {isLoading ? (
         <div className='grid gap-4'>
           {grupos.map((g) => (
@@ -250,7 +288,7 @@ export function Configuracion() {
           </div>
         </form>
       )}
-    </Pagina>
+    </>
   )
 }
 

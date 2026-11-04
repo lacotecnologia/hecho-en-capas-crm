@@ -104,6 +104,10 @@ export type LineaPedido = {
   personalizado: boolean
   /** Salió del stock: no se imprime. */
   desdeStock: boolean
+  /** Unidades que salieron de existencias (el resto se imprime). */
+  deStock: number
+  /** Nombre o texto de cada unidad personalizada. */
+  textos: string[]
   /** Estado de su orden (o "listo" si salió del stock). */
   estado: EstadoOrden
   /** Color escogido por el cliente (null si el producto no escoge color). */
@@ -149,6 +153,8 @@ export type PedidoResumen = {
   /** Líneas listas / total de líneas */
   avance: { listas: number; total: number }
   fechaCompromiso: string | null
+  /** El compromiso trae hora (calculado con el taller). */
+  conHora: boolean
   creadoEn: string
   estadoPago: EstadoPago
 }
@@ -202,6 +208,10 @@ export type OrdenCola = {
   camas: number
   pedido: { id: number; codigo: string; cliente: string } | null
   fechaCompromiso: string | null
+  /** Debe estar lista a esta hora para cumplirle al cliente. */
+  horaLimite: string | null
+  /** Nombres que hay que imprimir (personalizados). */
+  textos: string[]
   impresoraId: number | null
   bobinaId: number | null
   operador: string | null

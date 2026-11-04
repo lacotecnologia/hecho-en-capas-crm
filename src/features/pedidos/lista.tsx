@@ -126,7 +126,7 @@ export function ListaPedidos() {
                 'en_produccion',
                 'listo',
               ].includes(p.estado)
-                ? textoCompromiso(p.fechaCompromiso)
+                ? textoCompromiso(p.fechaCompromiso, p.conHora)
                 : null
               const falta = p.total - p.pagado
               return (

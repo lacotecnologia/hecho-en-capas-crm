@@ -108,6 +108,13 @@ export const productos = pgTable(
     multicolor: boolean('multicolor').notNull().default(false),
     /** El comercial escoge el color entre las bobinas preaprobadas (producto_colores). */
     escogeColor: boolean('escoge_color').notNull().default(false),
+    /** El cliente puede pedirlo con su nombre o un texto (siempre se imprime). */
+    personalizaTexto: boolean('personaliza_texto').notNull().default(false),
+    maxLetras: integer('max_letras').notNull().default(12),
+    /** Minutos de ajustar el diseño por unidad. */
+    minPersonalizar: integer('min_personalizar').notNull().default(0),
+    /** Lo que se suma al precio de fábrica por unidad personalizada. */
+    precioPersonalizar: integer('precio_personalizar').notNull().default(0),
     diasFabricacion: integer('dias_fabricacion').notNull().default(2),
     impresoraId: integer('impresora_id').references(() => impresoras.id),
     bobinaId: integer('bobina_id').references(() => bobinas.id),
@@ -237,6 +244,12 @@ export const cotizaciones = pgTable(
     anticipo: integer('anticipo').notNull().default(0),
     diasFabricacion: integer('dias_fabricacion').notNull().default(0),
     diasEnvio: integer('dias_envio').notNull().default(0),
+    // Promesa de entrega calculada con el taller (al guardar y al enviar)
+    listoEn: timestamp('listo_en', { withTimezone: true }),
+    entregaEn: timestamp('entrega_en', { withTimezone: true }),
+    entregaFrase: text('entrega_frase').notNull().default(''),
+    entregaValidaHasta: timestamp('entrega_valida_hasta', { withTimezone: true }),
+    entregaPasos: jsonb('entrega_pasos').$type<string[]>().notNull().default([]),
     motivoRechazo: text('motivo_rechazo').notNull().default(''),
     enviadaEn: timestamp('enviada_en', { withTimezone: true }),
     venceEn: timestamp('vence_en', { withTimezone: true }),
@@ -271,6 +284,10 @@ export const cotizacionLineas = pgTable('cotizacion_lineas', {
   personalizado: boolean('personalizado').notNull().default(false),
   diasFabricacion: integer('dias_fabricacion').notNull().default(0),
   desdeStock: boolean('desde_stock').notNull().default(false),
+  /** Unidades que salen de existencias (el resto se imprime). */
+  deStock: integer('de_stock').notNull().default(0),
+  /** Nombre o texto de cada unidad personalizada. */
+  textos: jsonb('textos').$type<string[]>().notNull().default([]),
   /** Color escogido (bobina preaprobada); null si el producto no escoge color. */
   bobinaId: integer('bobina_id').references(() => bobinas.id),
   color: text('color').notNull().default(''),
@@ -337,6 +354,8 @@ export const pedidos = pgTable(
     diasEnvio: integer('dias_envio').notNull().default(0),
     /** Fecha prometida al cliente; se calcula cuando empieza la producción. */
     fechaCompromiso: timestamp('fecha_compromiso', { withTimezone: true }),
+    /** Cuándo debe quedar listo en el taller para cumplir la entrega. */
+    listoCompromiso: timestamp('listo_compromiso', { withTimezone: true }),
     notas: text('notas').notNull().default(''),
     numeroFactura: text('numero_factura').notNull().default(''),
     motivoCancelacion: text('motivo_cancelacion').notNull().default(''),
@@ -370,6 +389,9 @@ export const pedidoLineas = pgTable('pedido_lineas', {
   personalizado: boolean('personalizado').notNull().default(false),
   /** Se descontó del stock al crear el pedido: no se imprime. */
   desdeStock: boolean('desde_stock').notNull().default(false),
+  /** Unidades que salieron de existencias (el resto se imprime). */
+  deStock: integer('de_stock').notNull().default(0),
+  textos: jsonb('textos').$type<string[]>().notNull().default([]),
   bobinaId: integer('bobina_id').references(() => bobinas.id),
   color: text('color').notNull().default(''),
   colorHex: text('color_hex').notNull().default(''),
@@ -408,6 +430,8 @@ export const ordenesProduccion = pgTable(
     operadorId: integer('operador_id').references(() => usuarios.id),
     inicio: timestamp('inicio', { withTimezone: true }),
     finEstimado: timestamp('fin_estimado', { withTimezone: true }),
+    /** Debe estar lista a esta hora para cumplirle al cliente. */
+    horaLimite: timestamp('hora_limite', { withTimezone: true }),
     finReal: timestamp('fin_real', { withTimezone: true }),
     intentos: integer('intentos').notNull().default(0),
     gramosPerdidos: integer('gramos_perdidos').notNull().default(0),

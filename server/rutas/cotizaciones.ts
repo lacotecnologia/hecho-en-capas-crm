@@ -14,6 +14,8 @@ import {
   validarColoresCotizacion,
   validarParaEnviar,
   validarPreciosCotizacion,
+  validarTextosCotizacion,
+  fabricaDeLinea,
 } from '../../shared/cotizacion.js'
 import { skuDe } from '../../shared/taller.js'
 import { getDb } from '../db/index.js'
@@ -29,9 +31,10 @@ import {
   usuarios,
 } from '../db/schema.js'
 import { conSesion, soloRoles, type UsuarioSesion, type Variables } from '../sesion.js'
+import { estadoTaller, promesaAhora } from '../promesa.js'
 import { coloresDe } from '../stock.js'
 import { permisoDeSubida, SOLO_IMAGENES, urlDeBlobValida } from '../subidas.js'
-import { leerConfiguracion } from './configuracion.js'
+import { leerAgendaDb, leerConfiguracion } from './configuracion.js'
 
 export const rutasCotizaciones = new Hono<{ Variables: Variables }>()
 
@@ -127,6 +130,8 @@ async function detalle(cot: FilaCot, u: UsuarioSesion): Promise<CotizacionDetall
     personalizado: l.personalizado,
     diasFabricacion: l.diasFabricacion,
     desdeStock: l.desdeStock,
+    deStock: l.deStock,
+    textos: l.textos,
     bobinaId: l.bobinaId,
     color: l.color,
     colorHex: l.colorHex,
@@ -178,6 +183,17 @@ async function detalle(cot: FilaCot, u: UsuarioSesion): Promise<CotizacionDetall
     resumen: ocultar ? { ...resumen, ganancia: 0 } : resumen,
     reemplazadaPor: siguiente?.id ?? null,
     pedido: pedido ?? null,
+    promesa:
+      cot.entregaEn && cot.listoEn
+        ? {
+            calculadaEn: (cot.enviadaEn ?? cot.actualizadoEn).toISOString(),
+            listoEn: cot.listoEn.toISOString(),
+            entregaEn: cot.entregaEn.toISOString(),
+            frase: cot.entregaFrase,
+            validaHasta: cot.entregaValidaHasta?.toISOString() ?? null,
+            pasos: cot.entregaPasos,
+          }
+        : null,
   }
 }
 
@@ -196,6 +212,8 @@ async function armar(entrada: CotizacionEntrada) {
         .where(and(inArray(productos.id, ids), isNull(productos.borradoEn)))
     : []
   const mapa = new Map(prods.map((p) => [p.id, p]))
+  const vt = validarTextosCotizacion(entrada.lineas, mapa)
+  if (!vt.ok) return vt
   const v = validarPreciosCotizacion(entrada.lineas, mapa, entrada.descuento, config.tope_comercial)
   if (!v.ok) return v
   const colores = await coloresDe(
@@ -229,17 +247,21 @@ async function armar(entrada: CotizacionEntrada) {
       ? (colores.get(p.id) ?? []).find((c) => c.bobinaId === l.bobinaId)
       : undefined
     const stock = p.escogeColor ? (color?.stock ?? 0) : p.stock
+    // Lo personalizado con nombre siempre se imprime
+    const deStock = l.textos.length ? 0 : Math.min(stock, l.cantidad)
     return {
       productoId: p.id,
       nombre: p.nombre,
       descripcion: p.descripcion,
       imagen: portada.get(p.id) ?? null,
       cantidad: l.cantidad,
-      precioFabrica: p.precioFabrica,
+      precioFabrica: fabricaDeLinea(p, l.textos),
       precioVenta: l.precioVenta,
-      personalizado: p.tipo === 'personalizado',
+      personalizado: p.tipo === 'personalizado' || l.textos.length > 0,
       diasFabricacion: p.diasFabricacion,
-      desdeStock: stock >= l.cantidad,
+      desdeStock: deStock >= l.cantidad,
+      deStock,
+      textos: l.textos,
       bobinaId: color?.bobinaId ?? null,
       color: color?.color ?? '',
       colorHex: color?.colorHex ?? '',
@@ -252,7 +274,21 @@ async function armar(entrada: CotizacionEntrada) {
     entrada.modalidad,
     config
   )
-  return { ok: true as const, lineas, resumen, config }
+  // Hora de entrega con el estado del taller de este momento
+  const promesa = lineas.length
+    ? await promesaAhora(
+        db,
+        lineas.map((l, i) => ({
+          clave: String(i),
+          productoId: l.productoId,
+          cantidad: l.cantidad,
+          bobinaId: l.bobinaId,
+          textos: l.textos,
+        })),
+        entrada.modalidad
+      )
+    : null
+  return { ok: true as const, lineas, resumen, config, promesa }
 }
 
 async function guardarHijos(
@@ -282,6 +318,21 @@ const columnasResumen = (r: Awaited<ReturnType<typeof armar>> & { ok: true }) =>
   anticipo: r.resumen.anticipo,
   diasFabricacion: r.resumen.diasFabricacion,
   diasEnvio: r.resumen.diasEnvio,
+  ...(r.promesa?.ok
+    ? {
+        listoEn: new Date(r.promesa.listoEn),
+        entregaEn: new Date(r.promesa.entregaEn),
+        entregaFrase: r.promesa.frase,
+        entregaValidaHasta: r.promesa.validaHasta ? new Date(r.promesa.validaHasta) : null,
+        entregaPasos: r.promesa.pasos,
+      }
+    : {
+        listoEn: null,
+        entregaEn: null,
+        entregaFrase: '',
+        entregaValidaHasta: null,
+        entregaPasos: [],
+      }),
 })
 
 // ===================== Rutas =====================
@@ -324,6 +375,13 @@ rutasCotizaciones.get('/', ve, async (c) => {
     venceEn: cot.venceEn?.toISOString() ?? null,
   }))
   return c.json({ cotizaciones: lista })
+})
+
+/** Estado del taller para calcular la entrega mientras se cotiza. */
+rutasCotizaciones.get('/taller', vende, async (c) => {
+  const db = getDb()
+  const [agenda, taller] = await Promise.all([leerAgendaDb(), estadoTaller(db)])
+  return c.json({ agenda, taller, ahora: new Date().toISOString() })
 })
 
 rutasCotizaciones.get('/:id', ve, async (c) => {
@@ -439,6 +497,7 @@ rutasCotizaciones.post('/:id/enviar', vende, async (c) => {
       cantidad: cotizacionLineas.cantidad,
       precioVenta: cotizacionLineas.precioVenta,
       bobinaId: cotizacionLineas.bobinaId,
+      textos: cotizacionLineas.textos,
     })
     .from(cotizacionLineas)
     .where(eq(cotizacionLineas.cotizacionId, r0.cot.id))

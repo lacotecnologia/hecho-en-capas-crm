@@ -16,6 +16,7 @@ import {
   clientes,
   impresoras,
   ordenesProduccion,
+  pedidoLineas,
   pedidos,
   productoArchivos,
   productos,
@@ -55,6 +56,7 @@ async function listar(ids?: number[]): Promise<OrdenCola[]> {
       },
       pedidoCodigo: pedidos.codigo,
       fechaCompromiso: pedidos.fechaCompromiso,
+      textos: pedidoLineas.textos,
       cliente: clientes.nombre,
       operador: usuarios.nombre,
       color: {
@@ -68,6 +70,7 @@ async function listar(ids?: number[]): Promise<OrdenCola[]> {
     .innerJoin(productos, eq(productos.id, ordenesProduccion.productoId))
     .leftJoin(colorPedido, eq(colorPedido.id, ordenesProduccion.colorBobinaId))
     .leftJoin(pedidos, eq(pedidos.id, ordenesProduccion.pedidoId))
+    .leftJoin(pedidoLineas, eq(pedidoLineas.id, ordenesProduccion.lineaId))
     .leftJoin(clientes, eq(clientes.id, pedidos.clienteId))
     .leftJoin(usuarios, eq(usuarios.id, ordenesProduccion.operadorId))
     .where(
@@ -84,8 +87,9 @@ async function listar(ids?: number[]): Promise<OrdenCola[]> {
             )
           ))
     )
-    // Primero lo que se le prometió antes al cliente; lo de stock al final
+    // Primero lo que debe estar listo antes; lo de stock al final
     .orderBy(
+      sql`${ordenesProduccion.horaLimite} asc nulls last`,
       sql`${pedidos.fechaCompromiso} asc nulls last`,
       asc(ordenesProduccion.id)
     )
@@ -100,7 +104,7 @@ async function listar(ids?: number[]): Promise<OrdenCola[]> {
   const portada = new Map<number, string>()
   for (const f of fotos) if (!portada.has(f.productoId)) portada.set(f.productoId, f.url)
 
-  return filas.map(({ o, producto, pedidoCodigo, fechaCompromiso, cliente, operador, color }) => {
+  return filas.map(({ o, producto, pedidoCodigo, fechaCompromiso, textos, cliente, operador, color }) => {
     const est = estimarOrden(producto.horas, producto.unidadesPorCama, o.cantidad)
     return {
       id: o.id,
@@ -123,6 +127,8 @@ async function listar(ids?: number[]): Promise<OrdenCola[]> {
           ? { id: o.pedidoId, codigo: pedidoCodigo, cliente: cliente ?? '' }
           : null,
       fechaCompromiso: fechaCompromiso?.toISOString() ?? null,
+      horaLimite: o.horaLimite?.toISOString() ?? null,
+      textos: textos ?? [],
       impresoraId: o.impresoraId,
       bobinaId: o.bobinaId,
       operador,

@@ -4,6 +4,7 @@
  */
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { sumarDiasHabiles } from '../shared/cotizacion.js'
+import { comprometerPedido } from './promesa.js'
 import { costoEnvioCobrado, type Entrega, type EstadoEntrega } from '../shared/entregas.js'
 import {
   calcularEstadoPedido,
@@ -112,8 +113,12 @@ export async function recalcularPedido(tx: Tx, pedidoId: number, usuarioId: numb
         })
       }
     }
-    if (!p.fechaCompromiso) {
-      cambios.fechaCompromiso = sumarDiasHabiles(new Date(), p.diasFabricacion + p.diasEnvio)
+    if (!p.fechaCompromiso && esperando.length) {
+      // Pagó el anticipo: el compromiso se calcula con la cola de este momento
+      const r = await comprometerPedido(tx, pedidoId)
+      if (!r?.ok) {
+        cambios.fechaCompromiso = sumarDiasHabiles(new Date(), p.diasFabricacion + p.diasEnvio)
+      }
     }
   }
 

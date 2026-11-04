@@ -15,7 +15,6 @@ import {
   MODALIDADES_INFO,
   type Modalidad,
   calcularCotizacion,
-  sumarDiasHabiles,
 } from '@shared/cotizacion'
 import { type ProductoResumen } from '@shared/taller'
 import {
@@ -50,6 +49,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Campo, CampoNumero } from '@/components/campo'
 import { BotonesColor } from '@/components/color'
@@ -64,6 +64,12 @@ import {
   pedirPersonalizado,
   quitarImagen,
 } from './api'
+import { TarjetaEntrega } from './entrega'
+import {
+  disponibilidad,
+  fraseCorta,
+  usePromesaCotizacion,
+} from './entrega-calculo'
 import { EstadoCotizacionBadge, formatoFechaLarga } from './estado'
 import { SelectorCliente } from './selector-cliente'
 import { SelectorProducto } from './selector-producto'
@@ -81,7 +87,18 @@ type LineaForm = {
   precioVenta: string
   /** Color escogido (solo en productos con colores). */
   bobinaId: number | null
+  /** Lleva nombre o texto (un nombre por unidad). */
+  personaliza: boolean
+  /** Un nombre por renglón. */
+  nombres: string
 }
+
+/** Los nombres escritos, sin renglones vacíos. */
+const listaNombres = (t: string) =>
+  t
+    .split('\n')
+    .map((x) => x.trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
 
 type CargoForm = { concepto: string; valor: string }
 
@@ -121,6 +138,8 @@ export function EditorCotizacion({
         cantidad: String(l.cantidad),
         precioVenta: String(l.precioVenta),
         bobinaId: l.bobinaId,
+        personaliza: l.textos.length > 0,
+        nombres: l.textos.join('\n'),
       })) ?? []
   )
   const [cargos, setCargos] = useState<CargoForm[]>(
@@ -164,14 +183,24 @@ export function EditorCotizacion({
     return p.colores.find((c) => c.bobinaId === l.bobinaId)?.stock ?? 0
   }
 
+  /** Precio de fábrica de la línea: el de hoy, más lo de personalizar. */
+  const fabricaDe = (l: LineaForm) => {
+    const p = enCatalogo.get(l.productoId)
+    if (!p) return l.precioFabrica
+    return p.precioFabrica + (l.personaliza ? p.personalizacion.precio : 0)
+  }
+  /** Con nombres, la cantidad es cuántos nombres hay. */
+  const cantidadDe = (l: LineaForm) =>
+    l.personaliza ? listaNombres(l.nombres).length : Number(l.cantidad) || 0
+
   const lineasCalc = lineas.map((l) => {
-    const cantidad = Number(l.cantidad) || 0
-    const stock = stockDe(l)
+    const cantidad = cantidadDe(l)
+    const stock = l.personaliza ? 0 : stockDe(l)
     return {
       cantidad,
-      precioFabrica: l.precioFabrica,
+      precioFabrica: fabricaDe(l),
       precioVenta: Number(l.precioVenta) || 0,
-      personalizado: l.personalizado,
+      personalizado: l.personalizado || l.personaliza,
       diasFabricacion: l.diasFabricacion,
       desdeStock: cantidad > 0 && stock >= cantidad,
     }
@@ -188,19 +217,31 @@ export function EditorCotizacion({
     config ?? {}
   )
   const gananciaSinDescuento = resumen.ganancia + resumen.descuento
-  const entrega = sumarDiasHabiles(
-    new Date(),
-    resumen.diasFabricacion + resumen.diasEnvio
+  const entrega = usePromesaCotizacion(
+    lineas.map((l) => ({
+      productoId: l.productoId,
+      cantidad: cantidadDe(l),
+      bobinaId: l.bobinaId,
+      personaliza: l.personaliza,
+    })),
+    modalidad,
+    enCatalogo
   )
+  const resultadoLinea = (i: number) =>
+    entrega.promesa?.ok
+      ? entrega.promesa.lineas.find((r) => r.clave === String(i))
+      : undefined
+  const conAnticipo = lineasCalc.some((l) => l.personalizado)
 
   const entrada = (): CotizacionEntrada => ({
     clienteId: cliente?.id ?? null,
     modalidad,
     lineas: lineas.map((l) => ({
       productoId: l.productoId,
-      cantidad: Number(l.cantidad) || 0,
+      cantidad: cantidadDe(l),
       precioVenta: Number(l.precioVenta) || 0,
       bobinaId: l.bobinaId,
+      textos: l.personaliza ? listaNombres(l.nombres) : [],
     })),
     cargos: cargosCalc.filter((c) => c.concepto.trim() || c.valor),
     descuento: Number(descuento) || 0,
@@ -263,9 +304,7 @@ export function EditorCotizacion({
     if (p.escogeColor) {
       // Con colores, el mismo producto puede ir otra vez en otro color
       if (iguales.some((l) => !l.bobinaId)) {
-        toast.info(
-          `Primero escoge el color de “${p.nombre}” que ya agregaste.`
-        )
+        toast.info(`Primero escoge el color de “${p.nombre}” que ya agregaste.`)
         return
       }
       if (iguales.length >= p.colores.length) {
@@ -291,6 +330,8 @@ export function EditorCotizacion({
         cantidad: '1',
         precioVenta: String(precioMaximoComercial(p.precioFabrica, tope)),
         bobinaId: null,
+        personaliza: false,
+        nombres: '',
       },
     ])
   }
@@ -355,16 +396,23 @@ export function EditorCotizacion({
                 </p>
               )}
               {lineas.map((l, i) => {
-                const maximo = precioMaximoComercial(l.precioFabrica, tope)
+                const fabrica = fabricaDe(l)
+                const maximo = precioMaximoComercial(fabrica, tope)
                 const precio = Number(l.precioVenta) || 0
-                const cant = Number(l.cantidad) || 0
-                const fuera = precio < l.precioFabrica || precio > maximo
+                const cant = cantidadDe(l)
+                const fuera = precio < fabrica || precio > maximo
                 const noRedondo =
-                  precio > 0 &&
-                  precio !== l.precioFabrica &&
-                  !esPrecioRedondo(precio)
-                const stock = stockDe(l)
+                  precio > 0 && precio !== fabrica && !esPrecioRedondo(precio)
                 const producto = enCatalogo.get(l.productoId)
+                const disp =
+                  cant > 0 && entrega.promesa?.ok
+                    ? disponibilidad(resultadoLinea(i), entrega.promesa.desde)
+                    : null
+                const pers = producto?.personalizacion
+                const nombresLista = listaNombres(l.nombres)
+                const largos = pers
+                  ? nombresLista.filter((n) => n.length > pers.maxLetras)
+                  : []
                 const conColor = !!producto?.escogeColor
                 // Colores que ya usa otra línea del mismo producto
                 const usados = lineas
@@ -391,11 +439,23 @@ export function EditorCotizacion({
                         <div className='min-w-0 flex-1'>
                           <p className='font-semibold'>{l.nombre}</p>
                           <p className='text-sm text-muted-foreground'>
-                            Fábrica {formatoPesos(l.precioFabrica)} · máximo{' '}
+                            Fábrica {formatoPesos(fabrica)} · máximo{' '}
                             {formatoPesos(maximo)}
-                            {l.personalizado && ' · personalizado'}
-                            {cant > 0 && stock >= cant && ' · sale de stock'}
+                            {(l.personalizado || l.personaliza) &&
+                              ' · personalizado (pide anticipo)'}
                           </p>
+                          {disp && (
+                            <p
+                              className={cn(
+                                'mt-1 inline-flex rounded-md px-2 py-0.5 text-xs font-medium',
+                                disp.tono === 'listo'
+                                  ? 'bg-primary/10 text-primary'
+                                  : 'bg-marca-ambar/20 text-foreground'
+                              )}
+                            >
+                              {disp.texto}
+                            </p>
+                          )}
                         </div>
                         <Button
                           type='button'
@@ -427,23 +487,93 @@ export function EditorCotizacion({
                               color: c.color,
                               colorHex: c.colorHex,
                               detalle:
-                                c.stock > 0 ? `${c.stock} en stock` : 'Se imprime',
+                                c.stock > 0
+                                  ? `${c.stock} en stock`
+                                  : 'Se imprime',
                               deshabilitado: usados.includes(c.bobinaId),
                             }))}
                             seleccion={l.bobinaId ? [l.bobinaId] : []}
                             onChange={([id]) =>
                               cambiarLinea(i, { bobinaId: id ?? null })
                             }
-                            invalido={!l.bobinaId && errorDe('lineas') !== undefined}
+                            invalido={
+                              !l.bobinaId && errorDe('lineas') !== undefined
+                            }
                           />
                         </div>
                       )}
+                      {pers?.activa && (
+                        <div className='grid gap-2 rounded-lg bg-muted/50 p-3'>
+                          <label className='flex items-center gap-3 text-sm font-medium'>
+                            <Switch
+                              checked={l.personaliza}
+                              onCheckedChange={(v) => {
+                                const extra = pers.precio
+                                cambiarLinea(i, {
+                                  personaliza: v,
+                                  // El precio sube o baja lo de personalizar
+                                  precioVenta: String(
+                                    Math.max(0, precio + (v ? extra : -extra))
+                                  ),
+                                })
+                              }}
+                            />
+                            Lleva nombre o texto
+                            {pers.precio > 0 && (
+                              <span className='font-normal text-muted-foreground'>
+                                (+{formatoPesos(pers.precio)} por unidad)
+                              </span>
+                            )}
+                          </label>
+                          {l.personaliza && (
+                            <Campo
+                              etiqueta='Nombres'
+                              ayuda={`Uno por renglón: cada nombre es una unidad. Máximo ${pers.maxLetras} letras cada uno. Lo personalizado siempre se imprime.`}
+                              error={
+                                largos.length
+                                  ? `Muy ${largos.length === 1 ? 'largo' : 'largos'}: ${largos.join(', ')}.`
+                                  : undefined
+                              }
+                            >
+                              {(id, ayudaId) => (
+                                <Textarea
+                                  id={id}
+                                  aria-describedby={ayudaId}
+                                  rows={Math.min(
+                                    8,
+                                    Math.max(3, nombresLista.length + 1)
+                                  )}
+                                  value={l.nombres}
+                                  placeholder={'Sofía\nMateo\nAbuela Rosa'}
+                                  onChange={(e) =>
+                                    cambiarLinea(i, { nombres: e.target.value })
+                                  }
+                                />
+                              )}
+                            </Campo>
+                          )}
+                        </div>
+                      )}
                       <div className='grid gap-3 sm:grid-cols-[110px_1fr]'>
-                        <CampoNumero
-                          etiqueta='Cantidad'
-                          valor={l.cantidad}
-                          onChange={(v) => cambiarLinea(i, { cantidad: v })}
-                        />
+                        {l.personaliza ? (
+                          <div className='grid content-start gap-1.5'>
+                            <span className='text-sm font-medium'>
+                              Cantidad
+                            </span>
+                            <p className='flex h-9 items-center rounded-md border bg-muted/50 px-3 text-base tabular-nums'>
+                              {cant}
+                            </p>
+                            <span className='text-xs text-muted-foreground'>
+                              Un nombre por unidad
+                            </span>
+                          </div>
+                        ) : (
+                          <CampoNumero
+                            etiqueta='Cantidad'
+                            valor={l.cantidad}
+                            onChange={(v) => cambiarLinea(i, { cantidad: v })}
+                          />
+                        )}
                         <div className='grid gap-1.5'>
                           <CampoNumero
                             etiqueta='Precio por unidad'
@@ -454,7 +584,7 @@ export function EditorCotizacion({
                             }
                             error={
                               fuera
-                                ? `Debe estar entre ${formatoPesos(l.precioFabrica)} y ${formatoPesos(maximo)}.`
+                                ? `Debe estar entre ${formatoPesos(fabrica)} y ${formatoPesos(maximo)}.`
                                 : noRedondo
                                   ? `Debe ser redondo a mil: usa ${formatoPesos(Math.min(maximo, redondearPrecio(precio)))}.`
                                   : undefined
@@ -462,7 +592,7 @@ export function EditorCotizacion({
                           />
                           <div className='flex flex-wrap gap-2'>
                             {[
-                              ['Precio de fábrica', l.precioFabrica],
+                              ['Precio de fábrica', fabrica],
                               ['Máximo', maximo],
                             ].map(([t, v]) => (
                               <button
@@ -484,7 +614,7 @@ export function EditorCotizacion({
                           Tu ganancia aquí:{' '}
                           <strong className='text-primary tabular-nums'>
                             {formatoPesos(
-                              Math.max(0, (precio - l.precioFabrica) * cant)
+                              Math.max(0, (precio - fabrica) * cant)
                             )}
                           </strong>
                         </span>
@@ -634,12 +764,9 @@ export function EditorCotizacion({
               aria-label='Forma de entrega'
             >
               {MODALIDADES.map((m) => {
-                const dias =
-                  m === 'local'
-                    ? (config?.dias_envio_local ?? 0)
-                    : m === 'nacional'
-                      ? (config?.dias_envio_nacional ?? 0)
-                      : 0
+                const frase = entrega.porModalidad
+                  ? fraseCorta(entrega.porModalidad[m])
+                  : '…'
                 return (
                   <button
                     key={m}
@@ -661,9 +788,7 @@ export function EditorCotizacion({
                       {MODALIDADES_INFO[m].nombre}
                     </span>
                     <span className='text-sm text-muted-foreground'>
-                      {dias === 0
-                        ? 'Sin días extra'
-                        : `+ ${dias} ${dias === 1 ? 'día' : 'días'}`}
+                      {frase}
                     </span>
                   </button>
                 )
@@ -744,14 +869,12 @@ export function EditorCotizacion({
                   </dd>
                 </dl>
               )}
-              <p className='text-sm'>
-                <span className='text-muted-foreground'>Entrega estimada:</span>{' '}
-                <strong>{formatoFechaLarga(entrega)}</strong>
-                <span className='block text-xs text-muted-foreground'>
-                  {resumen.diasFabricacion} días de fabricación +{' '}
-                  {resumen.diasEnvio} de envío (sin contar domingos)
-                </span>
-              </p>
+              <TarjetaEntrega
+                promesa={entrega.promesa}
+                cargando={entrega.cargando}
+                error={entrega.error}
+                conAnticipo={conAnticipo}
+              />
               <div className='flex items-center justify-between rounded-lg border border-dashed border-primary/40 p-3'>
                 <span className='text-sm'>
                   Tu ganancia

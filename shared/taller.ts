@@ -117,6 +117,28 @@ export type ProductoResumen = {
   stock: number
   portada: string | null
   actualizadoEn: string
+  /** Tiempos de la ficha: con ellos se calcula la hora de entrega. */
+  tiempos: TiemposProducto
+  personalizacion: PersonalizacionProducto
+}
+
+export type TiemposProducto = {
+  /** Horas de impresión por unidad. */
+  horasPorUnidad: number
+  unidadesPorCama: number
+  /** Minutos por unidad. */
+  minPreparacion: number
+  minAcabado: number
+}
+
+/** Nombre o texto por unidad (ej. esfera navideña con el nombre). */
+export type PersonalizacionProducto = {
+  activa: boolean
+  maxLetras: number
+  /** Minutos de ajustar el diseño por unidad. */
+  minutos: number
+  /** Se suma al precio de fábrica por unidad personalizada. */
+  precio: number
 }
 
 /** Datos del costo: solo los ven Admin y Taller. */
@@ -316,6 +338,10 @@ export type ProductoEntrada = {
   margenPct: number
   precioManual: number | null
   notaAjuste: string
+  personalizaTexto: boolean
+  maxLetras: number
+  minPersonalizar: number
+  precioPersonalizar: number
 }
 
 /**
@@ -342,6 +368,9 @@ export function validarProducto(
     unidadesLote: entero(c.unidadesLote ?? 1, { min: 1, max: 10_000, etiqueta: 'las unidades del lote', campo: 'unidadesLote' }),
     empaque: entero(c.empaque ?? 0, { min: 0, max: 1_000_000, etiqueta: 'el empaque', campo: 'empaque' }),
     precioManual: entero(c.precioManual, { min: 0, max: 100_000_000, etiqueta: 'el precio de fábrica', campo: 'precioManual', opcional: true }),
+    maxLetras: entero(c.maxLetras ?? 12, { min: 1, max: 60, etiqueta: 'el máximo de letras', campo: 'maxLetras' }),
+    minPersonalizar: entero(c.minPersonalizar ?? 0, { min: 0, max: 240, etiqueta: 'los minutos de ajustar el diseño', campo: 'minPersonalizar' }),
+    precioPersonalizar: entero(c.precioPersonalizar ?? 0, { min: 0, max: 1_000_000, etiqueta: 'el precio de personalizar', campo: 'precioPersonalizar' }),
   }
   for (const r of Object.values(chequeos)) if (!r.ok) return r
 
@@ -409,6 +438,11 @@ export function validarProducto(
       margenPct,
       precioManual: v('precioManual'),
       notaAjuste: texto(c.notaAjuste, 300),
+      personalizaTexto: Boolean(c.personalizaTexto),
+      maxLetras: v('maxLetras')!,
+      minPersonalizar: v('minPersonalizar')!,
+      // Precio de fábrica en miles, como el resto
+      precioPersonalizar: Math.ceil(v('precioPersonalizar')! / 1000) * 1000,
     },
   }
 }

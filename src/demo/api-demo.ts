@@ -5,6 +5,7 @@
  * localStorage, para poder revisar las pantallas sin servidor ni base de
  * datos. Los mensajes y las reglas son los mismos del servidor.
  */
+import { type Agenda, agendaPorDefecto, validarAgenda } from '@shared/agenda'
 import {
   CAMPOS_CONFIG,
   TEXTOS_CONFIG,
@@ -49,6 +50,7 @@ type EstadoDemo = {
   taller: TallerDemo
   cotizar: CotizarDemo
   pedidos: PedidosDemo
+  agenda?: Agenda
 }
 
 const CLAVE = 'hec-demo-v8'
@@ -339,7 +341,23 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
   // ---- Configuración ----
   if (ruta === '/configuracion' && metodo === 'GET') {
     yo(estado)
-    return { valores: estado.config, textos: estado.textos }
+    return {
+      valores: estado.config,
+      textos: estado.textos,
+      agenda: estado.agenda ?? agendaPorDefecto(),
+    }
+  }
+
+  if (ruta === '/configuracion/agenda' && metodo === 'PUT') {
+    soloAdmin(estado)
+    const v = validarAgenda(c)
+    if (!v.ok) fallo(400, v.mensaje, v.campo)
+    else estado.agenda = v.datos
+    return {
+      valores: estado.config,
+      textos: estado.textos,
+      agenda: estado.agenda ?? agendaPorDefecto(),
+    }
   }
 
   if (ruta === '/configuracion' && metodo === 'PUT') {
@@ -374,7 +392,11 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
       cambios++
     }
     if (cambios === 0) fallo(400, 'No hay cambios para guardar.')
-    return { valores: estado.config, textos: estado.textos }
+    return {
+      valores: estado.config,
+      textos: estado.textos,
+      agenda: estado.agenda ?? agendaPorDefecto(),
+    }
   }
 
   // ---- Personas ----
@@ -482,6 +504,25 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
   }
 
   // ---- Clientes y cotizaciones ----
+  if (ruta === '/cotizaciones/taller' && metodo === 'GET') {
+    yo(estado)
+    return {
+      agenda: estado.agenda ?? agendaPorDefecto(),
+      taller: {
+        impresoras: estado.taller.impresoras
+          .filter((i) => i.activa)
+          .map((i) => ({
+            id: i.id,
+            nombre: i.nombre,
+            multicolor: i.multicolor,
+            libreEn: null,
+          })),
+        cola: [],
+      },
+      ahora: new Date().toISOString(),
+    }
+  }
+
   if (ruta.startsWith('/clientes') || ruta.startsWith('/cotizaciones')) {
     const persona = yo(estado)
     const respuesta = atenderCotizar(

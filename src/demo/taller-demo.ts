@@ -25,9 +25,16 @@ import {
 } from '@shared/taller'
 import { ApiError } from '@/lib/api'
 
-export type ProductoDemo = Omit<ProductoResumen, 'portada' | 'sku' | 'colores'> &
+export type ProductoDemo = Omit<
+  ProductoResumen,
+  'portada' | 'sku' | 'colores' | 'tiempos' | 'personalizacion'
+> &
   ProductoCosto & {
     sku: string
+    personalizaTexto?: boolean
+    maxLetras?: number
+    minPersonalizar?: number
+    precioPersonalizar?: number
     /** Colores preaprobados con su stock (solo si escogeColor). */
     coloresStock: { bobinaId: number; stock: number }[]
   }
@@ -361,6 +368,18 @@ function resumen(t: TallerDemo, p: ProductoDemo): ProductoResumen {
     stock: p.stock,
     portada: portadaDe(t, p.id),
     actualizadoEn: p.actualizadoEn,
+    tiempos: {
+      horasPorUnidad: p.horas,
+      unidadesPorCama: p.unidadesPorCama,
+      minPreparacion: p.minPreparacion,
+      minAcabado: p.minPostproceso,
+    },
+    personalizacion: {
+      activa: p.personalizaTexto ?? false,
+      maxLetras: p.maxLetras ?? 12,
+      minutos: p.minPersonalizar ?? 0,
+      precio: p.precioPersonalizar ?? 0,
+    },
   }
 }
 
@@ -469,7 +488,11 @@ export function atenderTaller(
     if (!v.ok) return fallo(400, v.mensaje, v.campo)
     const { colores, ...e } = v.datos
     if (colores.some((id) => !t.bobinas.some((b) => b.id === id))) {
-      fallo(400, 'Uno de los colores ya no existe. Vuelve a marcarlos.', 'colores')
+      fallo(
+        400,
+        'Uno de los colores ya no existe. Vuelve a marcarlos.',
+        'colores'
+      )
     }
     const calc = calcularDemo(t, config, e)
     const imp = t.impresoras.find((i) => i.id === e.impresoraId) ?? null
@@ -525,7 +548,11 @@ export function atenderTaller(
     const p = buscar(r[1])
     const { colores, ...datos } = preparar()
     const plan = planColores(
-      { escogeColor: p.escogeColor, colores: coloresDemo(t, p), stock: p.stock },
+      {
+        escogeColor: p.escogeColor,
+        colores: coloresDemo(t, p),
+        stock: p.stock,
+      },
       { escogeColor: datos.escogeColor, colores, bobinaId: datos.bobinaId }
     )
     if (!plan.ok) return fallo(400, plan.mensaje, plan.campo)
@@ -547,7 +574,11 @@ export function atenderTaller(
     deTaller()
     const p = buscar(r[1])
     const v = validarAjusteStock(
-      { escogeColor: p.escogeColor, stock: p.stock, colores: coloresDemo(t, p) },
+      {
+        escogeColor: p.escogeColor,
+        stock: p.stock,
+        colores: coloresDemo(t, p),
+      },
       c
     )
     if (!v.ok) return fallo(400, v.mensaje, v.campo)

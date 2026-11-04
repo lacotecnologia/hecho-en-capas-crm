@@ -164,6 +164,10 @@ type Formulario = {
   subirAMano: boolean
   precioManual: string
   notaAjuste: string
+  personalizaTexto: boolean
+  maxLetras: string
+  minPersonalizar: string
+  precioPersonalizar: string
 }
 
 function formularioDe(
@@ -198,6 +202,10 @@ function formularioDe(
     subirAMano: c?.precioManual != null,
     precioManual: c?.precioManual != null ? String(c.precioManual) : '',
     notaAjuste: c?.notaAjuste ?? '',
+    personalizaTexto: p?.personalizacion.activa ?? false,
+    maxLetras: String(p?.personalizacion.maxLetras ?? 12),
+    minPersonalizar: String(p?.personalizacion.minutos ?? 10),
+    precioPersonalizar: String(p?.personalizacion.precio ?? 0),
   }
 }
 
@@ -287,6 +295,10 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
         margenPct: f.margenPct,
         precioManual: f.subirAMano && f.precioManual ? f.precioManual : null,
         notaAjuste: f.notaAjuste,
+        personalizaTexto: f.personalizaTexto,
+        maxLetras: f.maxLetras || 12,
+        minPersonalizar: f.minPersonalizar || 0,
+        precioPersonalizar: f.precioPersonalizar || 0,
       }),
     onSuccess: ({ producto: guardado }) => {
       queryClient.setQueryData(['taller', 'producto', guardado.id], {
@@ -608,6 +620,56 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
             onColores={set('colores')}
             error={errorDe('colores')}
           />
+
+          {/* ---------- Personalizar con nombre ---------- */}
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-lg'>Personalizar con nombre</CardTitle>
+              <CardDescription>
+                Para productos como la esfera con el nombre: el comercial
+                escribe un nombre por unidad. Siempre se imprime (no sale de
+                existencias) y pide anticipo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className='grid gap-4'>
+              <label className='flex items-center gap-3 font-medium'>
+                <Switch
+                  checked={f.personalizaTexto}
+                  onCheckedChange={(v) =>
+                    setF((p) => ({ ...p, personalizaTexto: v }))
+                  }
+                />
+                Se puede pedir con nombre o texto
+              </label>
+              {f.personalizaTexto && (
+                <div className='grid gap-4 sm:grid-cols-3'>
+                  <CampoNumero
+                    etiqueta='Máximo de letras'
+                    valor={f.maxLetras}
+                    onChange={set('maxLetras')}
+                    ayuda='Lo que cabe en la pieza.'
+                    error={errorDe('maxLetras')}
+                  />
+                  <CampoNumero
+                    etiqueta='Ajustar el diseño'
+                    unidad='min'
+                    valor={f.minPersonalizar}
+                    onChange={set('minPersonalizar')}
+                    ayuda='Por unidad: escribir el nombre y revisar.'
+                    error={errorDe('minPersonalizar')}
+                  />
+                  <CampoNumero
+                    etiqueta='Precio extra'
+                    unidad='COP'
+                    valor={f.precioPersonalizar}
+                    onChange={set('precioPersonalizar')}
+                    ayuda='Por unidad, sobre el precio de fábrica. Se redondea al mil.'
+                    error={errorDe('precioPersonalizar')}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* ---------- Trabajo a mano ---------- */}
           <Card>

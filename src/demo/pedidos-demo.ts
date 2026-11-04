@@ -70,7 +70,10 @@ import {
   type TallerDemo,
 } from './taller-demo'
 
-type LineaDemo = Omit<LineaPedido, 'estado'>
+type LineaDemo = Omit<LineaPedido, 'estado' | 'deStock' | 'textos'> & {
+  deStock?: number
+  textos?: string[]
+}
 
 type PedidoDemo = {
   id: number
@@ -311,6 +314,7 @@ export function atenderPedidos(
       },
       total: p.total,
       pagado: veSaldo ? pagado(p.id) : 0,
+      conHora: false,
       estadoPago: estadoPago({
         ...p,
         pagado: pagado(p.id),
@@ -341,6 +345,8 @@ export function atenderPedidos(
       modalidad: p.modalidad,
       lineas: p.lineas.map((l) => ({
         ...l,
+        deStock: l.deStock ?? (l.desdeStock ? l.cantidad : 0),
+        textos: l.textos ?? [],
         precioFabrica: veDinero ? l.precioFabrica : 0,
         estado: estadoLinea(p, l),
       })),
@@ -470,6 +476,7 @@ export function atenderPedidos(
         .join(' '),
       estado: p.estado,
       fechaCompromiso: p.fechaCompromiso,
+      conHora: false,
       modalidad: p.modalidad,
       lineas: p.lineas.map((l) => ({
         nombre: l.nombre,
@@ -819,6 +826,8 @@ export function atenderPedidos(
           precioVenta: l.precioVenta,
           personalizado: l.personalizado,
           desdeStock,
+          deStock: desdeStock ? l.cantidad : 0,
+          textos: l.textos ?? [],
           bobinaId: l.bobinaId ?? null,
           color: l.color ?? '',
           colorHex: l.colorHex ?? '',
@@ -1351,6 +1360,8 @@ export function atenderPedidos(
         : null,
       horas: est.horas,
       camas: est.camas,
+      horaLimite: null,
+      textos: p?.lineas.find((l) => l.id === o.lineaId)?.textos ?? [],
       pedido: p
         ? {
             id: p.id,
@@ -1423,7 +1434,8 @@ export function atenderPedidos(
       const elegido = prod.coloresStock.find(
         (x) => x.bobinaId === Number(c.bobinaId)
       )
-      if (!elegido) fallo(400, 'Escoge de qué color vas a imprimir.', 'bobinaId')
+      if (!elegido)
+        fallo(400, 'Escoge de qué color vas a imprimir.', 'bobinaId')
       colorBobinaId = elegido!.bobinaId
     }
     const o: OrdenDemo = {

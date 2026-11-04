@@ -2,7 +2,14 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { type CotizacionDetalle } from '@shared/cotizacion'
-import { ClipboardList, Loader2, Package, Printer, Wallet } from 'lucide-react'
+import {
+  ClipboardList,
+  Clock,
+  Loader2,
+  Package,
+  Printer,
+  Wallet,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { ApiError, mensajeDeError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -28,9 +35,12 @@ export function ConvertirEnPedido({
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [abierto, setAbierto] = useState(false)
+  /** La hora de entrega cambió desde la cotización: hay que confirmarla. */
+  const [cambioFecha, setCambioFecha] = useState<string | null>(null)
 
   const convertir = useMutation({
-    mutationFn: () => convertirCotizacion(c.id),
+    mutationFn: (aceptaNuevaFecha: boolean) =>
+      convertirCotizacion(c.id, aceptaNuevaFecha),
     onSuccess: ({ pedido }) => {
       queryClient.invalidateQueries({ queryKey: ['pedidos'] })
       queryClient.invalidateQueries({ queryKey: ['cola'] })
@@ -40,6 +50,10 @@ export function ConvertirEnPedido({
       navigate({ to: '/pedidos/$id', params: { id: String(pedido.id) } })
     },
     onError: (e) => {
+      if (e instanceof ApiError && e.campo === 'nuevaFecha') {
+        setCambioFecha(e.message)
+        return
+      }
       // Si ya existía, lleva directo al pedido
       if (e instanceof ApiError && e.status === 409) {
         queryClient.invalidateQueries({ queryKey: ['cotizacion', c.id] })
@@ -75,7 +89,8 @@ export function ConvertirEnPedido({
           <ul className='grid gap-3 text-sm'>
             <li className='flex gap-3'>
               <Package className='mt-0.5 size-4 shrink-0 text-primary' />
-              Lo que ya esté impreso en stock se aparta para este cliente.
+              Lo que ya esté impreso se aparta para este cliente (si no alcanza,
+              se imprime solo lo que falta).
             </li>
             <li className='flex gap-3'>
               <Printer className='mt-0.5 size-4 shrink-0 text-primary' />
@@ -94,20 +109,36 @@ export function ConvertirEnPedido({
               </li>
             )}
           </ul>
+          {cambioFecha && (
+            <div className='grid gap-2 rounded-lg border border-marca-naranja/50 bg-marca-naranja/10 p-3 text-sm'>
+              <p className='flex items-center gap-2 font-semibold'>
+                <Clock className='size-4' /> Cambió la hora de entrega
+              </p>
+              <p>{cambioFecha}</p>
+            </div>
+          )}
           <DialogFooter>
-            <Button variant='outline' onClick={() => setAbierto(false)}>
+            <Button
+              variant='outline'
+              onClick={() => {
+                setAbierto(false)
+                setCambioFecha(null)
+              }}
+            >
               Todavía no
             </Button>
             <Button
               disabled={convertir.isPending}
-              onClick={() => convertir.mutate()}
+              onClick={() => convertir.mutate(cambioFecha !== null)}
             >
               {convertir.isPending ? (
                 <Loader2 className='animate-spin' />
               ) : (
                 <ClipboardList />
               )}
-              Sí, crear el pedido
+              {cambioFecha
+                ? 'Ya le avisé: crear con la fecha nueva'
+                : 'Sí, crear el pedido'}
             </Button>
           </DialogFooter>
         </DialogContent>

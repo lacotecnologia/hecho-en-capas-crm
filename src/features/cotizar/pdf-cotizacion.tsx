@@ -18,6 +18,7 @@ import {
   MODALIDADES_INFO,
   sumarDiasHabiles,
 } from '@shared/cotizacion'
+import { fraseConFecha, horaDe } from '@shared/promesa'
 
 const VERDE = '#007a52'
 const AMBAR = '#f9ae12'
@@ -115,8 +116,20 @@ const s = StyleSheet.create({
   colUnit: { width: 80, textAlign: 'right' },
   colTotal: { width: 86, textAlign: 'right' },
   desc: { fontSize: 8, color: SUAVE, marginTop: 1 },
-  color: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, fontSize: 8.5 },
-  puntoColor: { width: 7, height: 7, borderRadius: 3.5, borderWidth: 0.5, borderColor: '#00000033' },
+  color: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+    fontSize: 8.5,
+  },
+  puntoColor: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    borderWidth: 0.5,
+    borderColor: '#00000033',
+  },
   totales: { alignSelf: 'flex-end', width: 236, marginTop: 10 },
   totalFila: {
     flexDirection: 'row',
@@ -296,10 +309,16 @@ function Documento({
                 {l.color ? (
                   <View style={s.color}>
                     <View
-                      style={[s.puntoColor, { backgroundColor: l.colorHex || '#999999' }]}
+                      style={[
+                        s.puntoColor,
+                        { backgroundColor: l.colorHex || '#999999' },
+                      ]}
                     />
                     <Text>Color: {l.color}</Text>
                   </View>
+                ) : null}
+                {l.textos.length ? (
+                  <Text style={s.desc}>Nombres: {l.textos.join(', ')}</Text>
                 ) : null}
                 {l.descripcion ? (
                   <Text style={s.desc}>{l.descripcion}</Text>
@@ -376,10 +395,25 @@ function Documento({
             </View>
             <View style={s.tiempo}>
               <Text style={s.etiqueta}>Fecha estimada</Text>
-              <Text style={s.fuerte}>{fecha(entrega)}</Text>
-              <Text style={{ fontSize: 7.5, color: SUAVE }}>
-                contando desde hoy{r.anticipo > 0 ? ' y el anticipo' : ''}
-              </Text>
+              {c.promesa ? (
+                <>
+                  <Text style={s.fuerte}>{fraseConFecha(c.promesa)}</Text>
+                  <Text style={{ fontSize: 7.5, color: SUAVE }}>
+                    {c.promesa.validaHasta
+                      ? `si confirmas${r.anticipo > 0 ? ' y pagas el anticipo' : ''} hoy antes de las ${horaDe(c.promesa.validaHasta)}`
+                      : r.anticipo > 0
+                        ? 'si pagas el anticipo hoy'
+                        : 'si confirmas hoy'}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={s.fuerte}>{fecha(entrega)}</Text>
+                  <Text style={{ fontSize: 7.5, color: SUAVE }}>
+                    contando desde hoy{r.anticipo > 0 ? ' y el anticipo' : ''}
+                  </Text>
+                </>
+              )}
             </View>
           </View>
         </View>

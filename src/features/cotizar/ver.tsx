@@ -6,6 +6,7 @@ import {
   MODALIDADES_INFO,
   sumarDiasHabiles,
 } from '@shared/cotizacion'
+import { conPunto, fraseConFecha, horaDe } from '@shared/promesa'
 import {
   Box,
   CheckCircle2,
@@ -234,8 +235,18 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
                     <p className='text-sm text-muted-foreground'>
                       {l.cantidad} × {formatoPesos(l.precioVenta)}
                       {l.personalizado && ' · personalizado'}
-                      {l.desdeStock && ' · sale de stock'}
+                      {l.desdeStock
+                        ? ' · sale de existencias'
+                        : l.deStock > 0
+                          ? ` · ${l.deStock} en existencia, ${l.cantidad - l.deStock} se imprimen`
+                          : ''}
                     </p>
+                    {l.textos.length > 0 && (
+                      <p className='text-sm'>
+                        <span className='text-muted-foreground'>Nombres:</span>{' '}
+                        {l.textos.join(', ')}
+                      </p>
+                    )}
                   </div>
                   <p className='font-semibold tabular-nums'>
                     {formatoPesos(l.cantidad * l.precioVenta)}
@@ -304,17 +315,35 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
                   </strong>
                 </p>
               )}
-              <p className='text-sm'>
-                <span className='text-muted-foreground'>Entrega:</span>{' '}
-                {MODALIDADES_INFO[c.modalidad].nombre}
-                <span className='block text-xs text-muted-foreground'>
-                  {c.resumen.diasFabricacion} días de fabricación +{' '}
-                  {c.resumen.diasEnvio} de envío
-                  {c.enviadaEn && (
-                    <> · estimada para el {formatoFechaLarga(estimada(c))}</>
-                  )}
-                </span>
-              </p>
+              {c.promesa ? (
+                <div className='grid gap-1 rounded-lg bg-accent/50 p-3 text-sm'>
+                  <span className='text-muted-foreground'>
+                    {MODALIDADES_INFO[c.modalidad].nombre}: se entrega
+                  </span>
+                  <strong className='text-base'>
+                    {fraseConFecha(c.promesa)}
+                  </strong>
+                  <span className='text-xs text-muted-foreground'>
+                    {conPunto(
+                      `Calculado con el taller el ${formatoFechaLarga(c.promesa.calculadaEn)} a las ${horaDe(c.promesa.calculadaEn)}${c.promesa.validaHasta ? `, si confirmaba antes de las ${horaDe(c.promesa.validaHasta)}` : ''}`
+                    )}{' '}
+                    Al crear el pedido se vuelve a calcular con la cola de ese
+                    momento.
+                  </span>
+                </div>
+              ) : (
+                <p className='text-sm'>
+                  <span className='text-muted-foreground'>Entrega:</span>{' '}
+                  {MODALIDADES_INFO[c.modalidad].nombre}
+                  <span className='block text-xs text-muted-foreground'>
+                    {c.resumen.diasFabricacion} días de fabricación +{' '}
+                    {c.resumen.diasEnvio} de envío
+                    {c.enviadaEn && (
+                      <> · estimada para el {formatoFechaLarga(estimada(c))}</>
+                    )}
+                  </span>
+                </p>
+              )}
               {verGanancia && (
                 <p className='flex items-center justify-between rounded-lg border border-dashed border-primary/40 p-3 text-sm'>
                   <span>Tu ganancia</span>

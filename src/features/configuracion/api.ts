@@ -1,10 +1,12 @@
 import { queryOptions } from '@tanstack/react-query'
+import { type Agenda } from '@shared/agenda'
 import { type TextosConfig, type ValoresConfig } from '@shared/configuracion'
 import { api } from '@/lib/api'
 
 export type ConfiguracionCompleta = {
   valores: ValoresConfig
   textos: TextosConfig
+  agenda: Agenda
 }
 
 const base = {
@@ -25,3 +27,15 @@ export const consultaTextosNegocio = queryOptions({
 })
 
 export const consultaConfiguracionCompleta = queryOptions(base)
+
+/** Horario del taller, festivos y reglas de entrega. */
+export const consultaAgenda = queryOptions({
+  ...base,
+  select: (d: ConfiguracionCompleta) => d.agenda,
+})
+
+export const guardarAgenda = (agenda: Agenda) =>
+  api<ConfiguracionCompleta>('/configuracion/agenda', {
+    method: 'PUT',
+    body: agenda,
+  })

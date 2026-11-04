@@ -92,6 +92,10 @@ export type LineaCotizacion = {
   diasFabricacion: number
   /** Hay stock suficiente (del color escogido): no hay que imprimir. */
   desdeStock: boolean
+  /** Unidades que hay listas para esta línea (el resto se imprime). */
+  deStock: number
+  /** Nombre o texto de cada unidad, si se personaliza (vacío si no). */
+  textos: string[]
   /** Color escogido (bobina preaprobada); null si el producto no escoge color. */
   bobinaId: number | null
   /** Nombre del color, ej. "Azul" ('' si no aplica). */
@@ -143,6 +147,17 @@ export type CotizacionDetalle = Omit<CotizacionResumen, 'cliente' | 'lineas'> & 
   reemplazadaPor: number | null
   /** El pedido que salió de esta cotización, si ya se convirtió. */
   pedido: { id: number; codigo: string } | null
+  /** Hora de entrega calculada con el taller al guardar (o al enviar). */
+  promesa: PromesaGuardada | null
+}
+
+export type PromesaGuardada = {
+  calculadaEn: string
+  listoEn: string
+  entregaEn: string
+  frase: string
+  validaHasta: string | null
+  pasos: string[]
 }
 
 // ---------- Cálculos ----------
@@ -247,7 +262,13 @@ export function validarCliente(c: Record<string, unknown>): Resultado<ClienteEnt
 export type CotizacionEntrada = {
   clienteId: number | null
   modalidad: Modalidad
-  lineas: { productoId: number; cantidad: number; precioVenta: number; bobinaId: number | null }[]
+  lineas: {
+    productoId: number
+    cantidad: number
+    precioVenta: number
+    bobinaId: number | null
+    textos: string[]
+  }[]
   cargos: Cargo[]
   descuento: number
   notas: string
@@ -270,6 +291,10 @@ export function leerEntradaCotizacion(
     cantidad: entero(l?.cantidad),
     precioVenta: entero(l?.precioVenta),
     bobinaId: entero(l?.bobinaId) > 0 ? entero(l?.bobinaId) : null,
+    textos: (Array.isArray(l?.textos) ? l.textos : [])
+      .map((t) => String(t ?? '').trim().replace(/\s+/g, ' '))
+      .filter((t) => t.length > 0)
+      .slice(0, 500),
   }))
   for (const l of lineas) {
     if (!(l.cantidad >= 1 && l.cantidad <= 100_000)) {
@@ -310,6 +335,44 @@ type ProductoParaCotizar = {
   nombre: string
   estado: string
   precioFabrica: number
+  personalizaTexto?: boolean
+  maxLetras?: number
+  precioPersonalizar?: number
+}
+
+/** Precio de fábrica de una línea: el del producto más lo de personalizar. */
+export function fabricaDeLinea(
+  p: { precioFabrica: number; precioPersonalizar?: number },
+  textos: string[]
+) {
+  return p.precioFabrica + (textos.length ? (p.precioPersonalizar ?? 0) : 0)
+}
+
+/** Nombres o textos: uno por unidad, que quepan, y solo si el producto lo permite. */
+export function validarTextosCotizacion(
+  lineas: { productoId: number; cantidad: number; textos: string[] }[],
+  productos: Map<number, ProductoParaCotizar>
+): Resultado<true> {
+  for (const l of lineas) {
+    if (!l.textos.length) continue
+    const p = productos.get(l.productoId)
+    if (!p) continue
+    if (!p.personalizaTexto) {
+      return malo(`"${p.nombre}" no se puede personalizar con texto. Quita los nombres.`, 'lineas')
+    }
+    if (l.textos.length !== l.cantidad) {
+      return malo(
+        `"${p.nombre}": escribiste ${l.textos.length} ${l.textos.length === 1 ? 'nombre' : 'nombres'} para ${l.cantidad} ${l.cantidad === 1 ? 'unidad' : 'unidades'}. Debe ir un nombre por unidad.`,
+        'lineas'
+      )
+    }
+    const max = p.maxLetras ?? 12
+    const largo = l.textos.find((t) => t.length > max)
+    if (largo) {
+      return malo(`"${largo}" es muy largo para "${p.nombre}": caben ${max} letras.`, 'lineas')
+    }
+  }
+  return { ok: true, datos: true }
 }
 
 /** Lo que hace falta saber de cada producto para revisar los colores. */
@@ -325,7 +388,7 @@ export type ColoresParaCotizar = {
  * varias veces si es en colores distintos.
  */
 export function validarColoresCotizacion(
-  lineas: { productoId: number; bobinaId: number | null }[],
+  lineas: { productoId: number; bobinaId: number | null; textos?: string[] }[],
   productos: Map<number, ColoresParaCotizar>
 ): Resultado<true> {
   const vistas = new Set<string>()
@@ -343,11 +406,12 @@ export function validarColoresCotizacion(
         )
       }
     }
-    const clave = `${l.productoId}-${p.escogeColor ? l.bobinaId : 0}`
+    const conNombre = l.textos?.length ? 1 : 0
+    const clave = `${l.productoId}-${p.escogeColor ? l.bobinaId : 0}-${conNombre}`
     if (vistas.has(clave)) {
       const color = p.colores.find((c) => c.bobinaId === l.bobinaId)?.color
       return malo(
-        `"${p.nombre}"${color ? ` en ${color}` : ''} está dos veces. Súmalas en una sola línea.`,
+        `"${p.nombre}"${color ? ` en ${color}` : ''}${conNombre ? ' con nombre' : ''} está dos veces. Súmalas en una sola línea.`,
         'lineas'
       )
     }
@@ -358,7 +422,7 @@ export function validarColoresCotizacion(
 
 /** Reglas de precio por línea y del descuento. */
 export function validarPreciosCotizacion(
-  lineas: { productoId: number; cantidad: number; precioVenta: number }[],
+  lineas: { productoId: number; cantidad: number; precioVenta: number; textos?: string[] }[],
   productos: Map<number, ProductoParaCotizar>,
   descuento: number,
   topePct: number
@@ -373,17 +437,18 @@ export function validarPreciosCotizacion(
         'lineas'
       )
     }
-    const maximo = precioMaximoComercial(p.precioFabrica, topePct)
+    const fabrica = fabricaDeLinea(p, l.textos ?? [])
+    const maximo = precioMaximoComercial(fabrica, topePct)
     // El precio de fábrica siempre se acepta, aunque venga de antes del redondeo al mil.
-    if (l.precioVenta !== p.precioFabrica && !esPrecioRedondo(l.precioVenta)) {
+    if (l.precioVenta !== fabrica && !esPrecioRedondo(l.precioVenta)) {
       return malo(
-        `El precio de "${p.nombre}" debe ser redondo a mil: usa ${fmt(Math.min(maximo, Math.max(p.precioFabrica, redondearPrecio(l.precioVenta))))}.`,
+        `El precio de "${p.nombre}" debe ser redondo a mil: usa ${fmt(Math.min(maximo, Math.max(fabrica, redondearPrecio(l.precioVenta))))}.`,
         'lineas'
       )
     }
-    if (l.precioVenta < p.precioFabrica) {
+    if (l.precioVenta < fabrica) {
       return malo(
-        `El precio de "${p.nombre}" no puede ser menor que el de fábrica (${fmt(p.precioFabrica)}).`,
+        `El precio de "${p.nombre}" no puede ser menor que el de fábrica (${fmt(fabrica)}).`,
         'lineas'
       )
     }
@@ -393,7 +458,7 @@ export function validarPreciosCotizacion(
         'lineas'
       )
     }
-    ganancia += (l.precioVenta - p.precioFabrica) * l.cantidad
+    ganancia += (l.precioVenta - fabrica) * l.cantidad
   }
   if (descuento > ganancia) {
     return malo(

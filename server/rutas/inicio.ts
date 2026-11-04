@@ -85,6 +85,41 @@ rutasInicio.get('/', async (c) => {
       .where(and(eq(pedidos.estado, 'entregado'), pedMios))
     agregar(deben.n, ['pedido entregado aún debe plata', 'pedidos entregados aún deben plata'], '/cobros')
   }
+  // Pedidos que van a llegar tarde: una orden pasó su hora límite (o va a
+  // terminar después de ella)
+  if (vende || taller) {
+    const [riesgo] = await db
+      .select({ n: sql<number>`count(distinct ${pedidos.id})::int` })
+      .from(ordenesProduccion)
+      .innerJoin(pedidos, eq(pedidos.id, ordenesProduccion.pedidoId))
+      .where(
+        and(
+          inArray(ordenesProduccion.estado, ['en_cola', 'imprimiendo', 'postproceso']),
+          isNull(pedidos.borradoEn),
+          or(
+            lt(ordenesProduccion.horaLimite, ahora),
+            and(
+              eq(ordenesProduccion.estado, 'imprimiendo'),
+              sql`${ordenesProduccion.finEstimado} > ${ordenesProduccion.horaLimite}`
+            )
+          ),
+          taller ? undefined : pedMios
+        )
+      )
+    agregar(
+      riesgo.n,
+      [
+        taller
+          ? 'pedido va tarde para la hora prometida: revisa la cola'
+          : 'pedido va tarde para la hora prometida: avísale al cliente',
+        taller
+          ? 'pedidos van tarde para la hora prometida: revisa la cola'
+          : 'pedidos van tarde para la hora prometida: avísales a los clientes',
+      ],
+      taller ? '/cola' : '/pedidos',
+      'urgente'
+    )
+  }
   if (taller) {
     const [solicitudes] = await db
       .select({ n: contar })

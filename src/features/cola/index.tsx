@@ -7,10 +7,12 @@ import {
   type OrdenCola,
   sumarHoras,
 } from '@shared/pedidos'
+import { momento, nombreDelDia } from '@shared/promesa'
 import {
   AlertTriangle,
   Box,
   CheckCircle2,
+  Clock,
   Loader2,
   Play,
   Plus,
@@ -459,7 +461,10 @@ function TarjetaOrden({
   const accion = useAccion()
   const queryClient = useQueryClient()
   const compromiso =
-    o.estado !== 'listo' ? textoCompromiso(o.fechaCompromiso) : null
+    o.estado !== 'listo' && !o.horaLimite
+      ? textoCompromiso(o.fechaCompromiso)
+      : null
+  const limite = o.estado !== 'listo' ? estadoLimite(o) : null
   return (
     <Card className='gap-2 py-3'>
       <CardContent className='grid gap-2 px-3'>
@@ -487,6 +492,26 @@ function TarjetaOrden({
             </p>
           </div>
         </div>
+        {o.textos.length > 0 && (
+          <p className='rounded-md bg-muted px-2 py-1 text-sm'>
+            <span className='font-medium'>Nombres:</span> {o.textos.join(' · ')}
+          </p>
+        )}
+        {limite && (
+          <p
+            className={cn(
+              'flex items-start gap-1.5 text-xs font-medium',
+              limite.tono === 'tarde'
+                ? 'rounded-md bg-destructive/10 px-2 py-1 text-destructive'
+                : limite.tono === 'pronto'
+                  ? 'text-marca-naranja'
+                  : 'text-muted-foreground'
+            )}
+          >
+            <Clock className='mt-px size-3.5 shrink-0' />
+            {limite.texto}
+          </p>
+        )}
         {compromiso && (
           <p
             className={cn(
@@ -986,11 +1011,38 @@ function FormStock({ onCerrar }: { onCerrar: () => void }) {
         </Button>
         <Button
           type='submit'
-          disabled={!productoId || (!!elegido?.escogeColor && !color) || enviando}
+          disabled={
+            !productoId || (!!elegido?.escogeColor && !color) || enviando
+          }
         >
           <Plus /> Agregar a la cola
         </Button>
       </DialogFooter>
     </form>
   )
+}
+
+/** Hora límite de la orden y si va tarde (por la hora o por cuándo termina). */
+function estadoLimite(o: OrdenCola) {
+  if (!o.horaLimite) return null
+  const ahora = new Date().toISOString()
+  const limite = new Date(o.horaLimite).getTime()
+  const termina = o.finEstimado ? new Date(o.finEstimado).getTime() : null
+  if (Date.now() > limite) {
+    return {
+      tono: 'tarde' as const,
+      texto: `Va tarde: debía estar lista ${momento(o.horaLimite, ahora)}`,
+    }
+  }
+  if (o.estado === 'imprimiendo' && termina && termina > limite) {
+    return {
+      tono: 'tarde' as const,
+      texto: `Va tarde: termina ${momento(o.finEstimado!, ahora)} y debe estar lista ${momento(o.horaLimite, ahora)}`,
+    }
+  }
+  const dia = nombreDelDia(o.horaLimite, ahora)
+  return {
+    tono: dia === 'hoy' ? ('pronto' as const) : ('normal' as const),
+    texto: `Debe estar lista ${momento(o.horaLimite, ahora)}`,
+  }
 }

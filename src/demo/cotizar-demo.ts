@@ -19,6 +19,8 @@ import {
   validarParaEnviar,
   validarColoresCotizacion,
   validarPreciosCotizacion,
+  validarTextosCotizacion,
+  fabricaDeLinea,
 } from '@shared/cotizacion'
 import { type Rol } from '@shared/roles'
 import { skuDe } from '@shared/taller'
@@ -232,12 +234,15 @@ export function atenderCotizar(
       reemplazadaPor:
         d.cotizaciones.find((x) => x.reemplazaId === cot.id)?.id ?? null,
       pedido: pedidoDe(cot.id),
+      promesa: null,
     }
   }
 
   /** Valida contra el catálogo de hoy y arma las líneas. */
   const armar = (e: CotizacionEntrada) => {
     const mapa = new Map(taller.productos.map((p) => [p.id, p]))
+    const vt = validarTextosCotizacion(e.lineas, mapa)
+    if (!vt.ok) return fallo(400, vt.mensaje, vt.campo)
     const v = validarPreciosCotizacion(
       e.lineas,
       mapa,
@@ -250,26 +255,39 @@ export function atenderCotizar(
       new Map(
         taller.productos.map((p) => [
           p.id,
-          { nombre: p.nombre, escogeColor: p.escogeColor, colores: coloresDemo(taller, p) },
+          {
+            nombre: p.nombre,
+            escogeColor: p.escogeColor,
+            colores: coloresDemo(taller, p),
+          },
         ])
       )
     )
     if (!vc.ok) return fallo(400, vc.mensaje, vc.campo)
     return e.lineas.map((l): LineaCotizacion => {
       const p = mapa.get(l.productoId)!
-      const color = coloresDemo(taller, p).find((x) => x.bobinaId === l.bobinaId)
+      const color = coloresDemo(taller, p).find(
+        (x) => x.bobinaId === l.bobinaId
+      )
+      const deStock = l.textos.length
+        ? 0
+        : Math.min(
+            l.cantidad,
+            stockDisponibleDemo(taller, p.id, color?.bobinaId ?? null)
+          )
       return {
         productoId: p.id,
         nombre: p.nombre,
         descripcion: p.descripcion,
         imagen: portadaDe(taller, p.id),
         cantidad: l.cantidad,
-        precioFabrica: p.precioFabrica,
+        precioFabrica: fabricaDeLinea(p, l.textos),
         precioVenta: l.precioVenta,
-        personalizado: p.tipo === 'personalizado',
+        personalizado: p.tipo === 'personalizado' || l.textos.length > 0,
         diasFabricacion: p.diasFabricacion,
-        desdeStock:
-          stockDisponibleDemo(taller, p.id, color?.bobinaId ?? null) >= l.cantidad,
+        desdeStock: deStock >= l.cantidad,
+        deStock,
+        textos: l.textos,
         bobinaId: color?.bobinaId ?? null,
         color: color?.color ?? '',
         colorHex: color?.colorHex ?? '',

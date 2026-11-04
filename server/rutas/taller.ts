@@ -150,6 +150,18 @@ function resumen(
     stock: p.stock,
     portada,
     actualizadoEn: p.actualizadoEn.toISOString(),
+    tiempos: {
+      horasPorUnidad: p.horas,
+      unidadesPorCama: p.unidadesPorCama,
+      minPreparacion: p.minPreparacion,
+      minAcabado: p.minPostproceso,
+    },
+    personalizacion: {
+      activa: p.personalizaTexto,
+      maxLetras: p.maxLetras,
+      minutos: p.minPersonalizar,
+      precio: p.precioPersonalizar,
+    },
   }
 }
 

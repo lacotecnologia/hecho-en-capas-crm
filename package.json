@@ -19,7 +19,8 @@
     "db:migrar": "tsx scripts/migrar.ts",
     "crear-admin": "tsx scripts/crear-admin.ts",
     "dev:prueba": "VITE_DEMO=1 vite",
-    "build:prueba": "VITE_DEMO=1 vite build --base ./ --outDir dist-prueba"
+    "build:prueba": "VITE_DEMO=1 vite build --base ./ --outDir dist-prueba",
+    "probar:promesa": "tsx scripts/probar-promesa.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",

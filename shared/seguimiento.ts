@@ -15,6 +15,8 @@ export type SeguimientoPublico = {
   cliente: string
   estado: EstadoPedido
   fechaCompromiso: string | null
+  /** El compromiso trae hora. */
+  conHora: boolean
   modalidad: Modalidad
   lineas: { nombre: string; cantidad: number; imagen: string | null; estado: EstadoLineaCliente }[]
   entrega: {

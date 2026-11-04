@@ -100,6 +100,7 @@ rutasSeguimiento.get('/:codigo', async (c) => {
     cliente: (cliente?.nombre ?? '').split(' ').slice(0, 3).join(' '),
     estado: p.estado as EstadoPedido,
     fechaCompromiso: p.fechaCompromiso?.toISOString() ?? null,
+    conHora: p.listoCompromiso !== null,
     modalidad: p.modalidad as SeguimientoPublico['modalidad'],
     lineas: lineas.map((l) => ({
       nombre: l.color ? `${l.nombre} · ${l.color}` : l.nombre,

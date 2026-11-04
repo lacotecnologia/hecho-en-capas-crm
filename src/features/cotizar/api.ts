@@ -1,10 +1,12 @@
 import { queryOptions } from '@tanstack/react-query'
+import { type Agenda } from '@shared/agenda'
 import {
   type Cliente,
   type CotizacionDetalle,
   type CotizacionEntrada,
   type CotizacionResumen,
 } from '@shared/cotizacion'
+import { type EstadoTaller } from '@shared/promesa'
 import { api } from '@/lib/api'
 
 export const consultaCotizaciones = queryOptions({
@@ -89,3 +91,14 @@ export function quitarImagen(id: number, imagenId: number) {
     { method: 'DELETE' }
   )
 }
+
+/** Horarios, reglas, impresoras y cola: para calcular la entrega mientras se cotiza. */
+export const consultaTallerCotizar = queryOptions({
+  queryKey: ['taller-cotizar'],
+  queryFn: () =>
+    api<{ agenda: Agenda; taller: EstadoTaller; ahora: string }>(
+      '/cotizaciones/taller'
+    ),
+  refetchInterval: 60_000,
+  staleTime: 30_000,
+})

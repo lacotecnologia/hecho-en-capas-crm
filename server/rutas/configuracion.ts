@@ -1,4 +1,6 @@
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
+import { CLAVE_AGENDA, leerAgenda, validarAgenda } from '../../shared/agenda.js'
 import {
   CAMPOS_CONFIG,
   TEXTOS_CONFIG,
@@ -37,8 +39,21 @@ export async function leerTextos(): Promise<TextosConfig> {
   return textos
 }
 
+/** Horario del taller, festivos y reglas de entrega. */
+export async function leerAgendaDb() {
+  const [fila] = await getDb()
+    .select({ valor: configuracion.valor })
+    .from(configuracion)
+    .where(eq(configuracion.clave, CLAVE_AGENDA))
+  return leerAgenda(fila?.valor)
+}
+
 async function todo() {
-  return { valores: await leerConfiguracion(), textos: await leerTextos() }
+  return {
+    valores: await leerConfiguracion(),
+    textos: await leerTextos(),
+    agenda: await leerAgendaDb(),
+  }
 }
 
 // Todas las personas pueden leer los valores (el comercial necesita el tope,
@@ -113,5 +128,24 @@ rutasConfiguracion.put('/', soloRoles('admin'), async (c) => {
     }
   })
 
+  return c.json(await todo())
+})
+
+rutasConfiguracion.put('/agenda', soloRoles('admin'), async (c) => {
+  const v = validarAgenda(await c.req.json().catch(() => ({})))
+  if (!v.ok) return c.json({ mensaje: v.mensaje, campo: v.campo }, 400)
+  const fila = {
+    clave: CLAVE_AGENDA,
+    valor: v.datos,
+    actualizadoEn: new Date(),
+    actualizadoPor: c.get('usuario').id,
+  }
+  await getDb()
+    .insert(configuracion)
+    .values(fila)
+    .onConflictDoUpdate({
+      target: configuracion.clave,
+      set: { valor: fila.valor, actualizadoEn: fila.actualizadoEn, actualizadoPor: fila.actualizadoPor },
+    })
   return c.json(await todo())
 })

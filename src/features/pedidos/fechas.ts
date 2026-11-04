@@ -1,3 +1,12 @@
+import { antesDeLa } from '@shared/agenda'
+import { nombreDelDia } from '@shared/promesa'
+
+/** Minutos del día en hora de Bogotá. */
+const minutosBogota = (d: string) => {
+  const t = new Date(new Date(d).getTime() - 5 * 3_600_000)
+  return t.getUTCHours() * 60 + t.getUTCMinutes()
+}
+
 const hora = new Intl.DateTimeFormat('es-CO', {
   hour: 'numeric',
   minute: '2-digit',
@@ -23,8 +32,29 @@ const inicioDelDia = (d: Date) =>
   new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
 
 /** "para hoy", "para mañana", "para el jue 29 oct", "atrasado 2 días" */
-export function textoCompromiso(fecha: string | null) {
+export function textoCompromiso(fecha: string | null, conHora = false) {
   if (!fecha) return null
+  if (conHora) {
+    const atraso = Date.now() - new Date(fecha).getTime()
+    if (atraso > 0) {
+      const horas = Math.floor(atraso / 3_600_000)
+      return {
+        texto:
+          horas < 24
+            ? `atrasado ${horas ? `${horas} h` : `${Math.max(1, Math.round(atraso / 60_000))} min`}`
+            : `atrasado ${Math.floor(horas / 24)} ${Math.floor(horas / 24) === 1 ? 'día' : 'días'}`,
+        tono: 'tarde' as const,
+      }
+    }
+    const dia = nombreDelDia(fecha, new Date())
+    return {
+      texto: `para ${dia} ${antesDeLa(minutosBogota(fecha))}`,
+      tono:
+        dia === 'hoy' || dia.startsWith('mañana')
+          ? ('pronto' as const)
+          : ('normal' as const),
+    }
+  }
   const dias = Math.round(
     (inicioDelDia(new Date(fecha)) - inicioDelDia(new Date())) / 86_400_000
   )

@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { type ProductoResumen } from '@shared/taller'
 import { Box, Check, Search } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { PuntosColores } from '@/components/color'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PuntoColor } from '@/components/color'
 import { consultaProductos } from '@/features/taller/api'
 import { formatoPesos } from '@/features/taller/formato'
 
@@ -100,13 +101,41 @@ export function SelectorProducto({
                     <Box className='m-auto mt-5 size-6 text-muted-foreground' />
                   )}
                 </div>
-                <div className='min-w-0 flex-1'>
+                <div className='grid min-w-0 flex-1 gap-0.5'>
                   <p className='leading-snug font-medium'>{p.nombre}</p>
-                  <p className='text-xs text-muted-foreground'>
+                  <p className='flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground'>
                     {p.sku}
-                    {p.stock > 0 && ` · ${p.stock} en stock`}
+                    <span
+                      className={cn(
+                        'rounded px-1.5 py-px font-medium',
+                        p.stock > 0
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-marca-ambar/20 text-foreground'
+                      )}
+                    >
+                      {p.stock > 0 ? `Hay ${p.stock} listos` : 'Se fabrica'}
+                    </span>
                   </p>
-                  {p.escogeColor && <PuntosColores colores={p.colores} />}
+                  {p.escogeColor && (
+                    <p className='flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground'>
+                      {p.colores.map((c) => (
+                        <span
+                          key={c.bobinaId}
+                          className='inline-flex items-center gap-1'
+                        >
+                          <PuntoColor hex={c.colorHex} className='size-3' />
+                          {c.color} {c.stock}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                  <p className='text-xs text-muted-foreground'>
+                    {tiempoImpresion(p.tiempos.horasPorUnidad)} por unidad
+                    {p.tiempos.unidadesPorCama > 1 &&
+                      ` · ${p.tiempos.unidadesPorCama} por cama`}
+                    {p.multicolor && ' · solo en impresora multicolor'}
+                    {p.personalizacion.activa && ' · acepta nombre'}
+                  </p>
                   <p className='text-sm font-semibold tabular-nums'>
                     {formatoPesos(p.precioFabrica)}
                     <span className='ms-1 text-xs font-normal text-muted-foreground'>
@@ -130,4 +159,13 @@ export function SelectorProducto({
       </DialogContent>
     </Dialog>
   )
+}
+
+/** 0.8 → "48 min"; 1.5 → "1 h 30 min" */
+function tiempoImpresion(horas: number) {
+  const min = Math.round(horas * 60)
+  if (min === 0) return 'Sin tiempo de impresión'
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return h ? (m ? `${h} h ${m} min` : `${h} h`) : `${m} min`
 }

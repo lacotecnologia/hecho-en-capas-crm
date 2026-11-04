@@ -12,6 +12,7 @@ import {
   type PedidoDetalle,
   TIPOS_PAGO_INFO,
 } from '@shared/pedidos'
+import { fechaPrometida } from '@shared/promesa'
 import {
   ArrowLeft,
   Ban,
@@ -145,7 +146,7 @@ function Ficha({ p }: { p: PedidoDetalle }) {
     'listo',
     'en_entrega',
   ].includes(p.estado)
-    ? textoCompromiso(p.fechaCompromiso)
+    ? textoCompromiso(p.fechaCompromiso, p.conHora)
     : null
   const cancelado = p.estado === 'cancelado'
   const pasoActual = PASOS_PEDIDO.findIndex((x) => x.estado === p.estado)
@@ -318,7 +319,16 @@ function Ficha({ p }: { p: PedidoDetalle }) {
                     <p className='text-sm text-muted-foreground'>
                       {l.cantidad} {l.cantidad === 1 ? 'unidad' : 'unidades'}
                       {l.personalizado && ' · personalizado'}
+                      {!l.desdeStock &&
+                        l.deStock > 0 &&
+                        ` · ${l.deStock} de existencias, ${l.cantidad - l.deStock} se imprimen`}
                     </p>
+                    {l.textos.length > 0 && (
+                      <p className='text-sm'>
+                        <span className='text-muted-foreground'>Nombres:</span>{' '}
+                        {l.textos.join(', ')}
+                      </p>
+                    )}
                   </div>
                   <div className='flex w-full items-center justify-between gap-3 ps-[68px] sm:w-auto sm:ps-0'>
                     {l.desdeStock ? (
@@ -486,19 +496,23 @@ function Ficha({ p }: { p: PedidoDetalle }) {
                 <p className='text-muted-foreground'>Fecha prometida</p>
                 {p.fechaCompromiso ? (
                   <p className='font-semibold'>
-                    {formatoFechaLarga(p.fechaCompromiso)}
-                    {compromiso && !cancelado && (
-                      <span
-                        className={cn(
-                          'ms-2 text-xs font-medium',
-                          compromiso.tono === 'tarde'
-                            ? 'text-destructive'
-                            : 'text-muted-foreground'
-                        )}
-                      >
-                        ({compromiso.texto})
-                      </span>
-                    )}
+                    {p.conHora
+                      ? fechaPrometida(p.fechaCompromiso)
+                      : formatoFechaLarga(p.fechaCompromiso)}
+                    {compromiso &&
+                      !cancelado &&
+                      (!p.conHora || compromiso.tono === 'tarde') && (
+                        <span
+                          className={cn(
+                            'ms-2 text-xs font-medium',
+                            compromiso.tono === 'tarde'
+                              ? 'text-destructive'
+                              : 'text-muted-foreground'
+                          )}
+                        >
+                          ({compromiso.texto})
+                        </span>
+                      )}
                   </p>
                 ) : (
                   <p>Se fija cuando llegue el anticipo.</p>

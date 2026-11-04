@@ -22,8 +22,14 @@ export const consultaPedido = (id: number) =>
 
 type RespuestaPedido = { pedido: PedidoDetalle }
 
-export const convertirCotizacion = (cotizacionId: number) =>
-  api<RespuestaPedido>('/pedidos', { method: 'POST', body: { cotizacionId } })
+export const convertirCotizacion = (
+  cotizacionId: number,
+  aceptaNuevaFecha = false
+) =>
+  api<RespuestaPedido>('/pedidos', {
+    method: 'POST',
+    body: { cotizacionId, aceptaNuevaFecha },
+  })
 
 export const registrarPago = (
   id: number,

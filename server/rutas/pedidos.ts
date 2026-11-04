@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { sumarDiasHabiles } from '../../shared/cotizacion.js'
+import { type Modalidad } from '../../shared/cotizacion.js'
+import { conPunto, fraseConFecha } from '../../shared/promesa.js'
 import { estadoPago, validarReembolso } from '../../shared/entregas.js'
 import {
   codigoPedido,
@@ -42,6 +43,7 @@ import {
 } from '../pedidos-logica.js'
 import { conSesion, soloRoles, type UsuarioSesion, type Variables } from '../sesion.js'
 import { aplicarDevolucion } from '../comisiones.js'
+import { comprometerPedido, promesaAhora } from '../promesa.js'
 import { moverStock, stockDisponible } from '../stock.js'
 import { permisoDeSubida, SOLO_IMAGENES, urlDeBlobValida } from '../subidas.js'
 
@@ -157,6 +159,8 @@ async function detalle(id: number, u: UsuarioSesion): Promise<PedidoDetalle | nu
     precioVenta: l.precioVenta,
     personalizado: l.personalizado,
     desdeStock: l.desdeStock,
+    deStock: l.deStock,
+    textos: l.textos,
     estado: l.desdeStock ? 'listo' : (estadoLinea.get(l.id) ?? 'en_cola'),
     bobinaId: l.bobinaId,
     color: l.color,
@@ -187,6 +191,7 @@ async function detalle(id: number, u: UsuarioSesion): Promise<PedidoDetalle | nu
       total: lineasOut.length,
     },
     fechaCompromiso: p.fechaCompromiso?.toISOString() ?? null,
+    conHora: p.listoCompromiso !== null,
     creadoEn: p.creadoEn.toISOString(),
     estadoPago: estadoPago({ ...p, pagado, cancelado: p.estado === 'cancelado' }),
     modalidad: p.modalidad as PedidoDetalle['modalidad'],
@@ -269,6 +274,7 @@ rutasPedidos.get('/', ve, async (c) => {
       pagado: veDinero(u) ? pagado : 0,
       avance: { listas, total: lineas },
       fechaCompromiso: p.fechaCompromiso?.toISOString() ?? null,
+      conHora: p.listoCompromiso !== null,
       creadoEn: p.creadoEn.toISOString(),
       estadoPago: estadoPago({ ...p, pagado, cancelado: p.estado === 'cancelado' }),
     }))
@@ -331,6 +337,33 @@ rutasPedidos.post('/', vende, async (c) => {
   const anio = anioBogota()
   const requiereAnticipo = cot.anticipo > 0
 
+  // La hora de entrega se vuelve a calcular con la cola de este momento.
+  // Si quedó más tarde de lo que vio el cliente, el comercial confirma primero.
+  if (!requiereAnticipo && cot.entregaEn && cuerpo.aceptaNuevaFecha !== true) {
+    const ahora = await promesaAhora(
+      db,
+      lineas.map((l) => ({
+        clave: String(l.id),
+        productoId: l.productoId,
+        cantidad: l.cantidad,
+        bobinaId: l.bobinaId,
+        textos: l.textos,
+      })),
+      cot.modalidad as Modalidad
+    )
+    // Se compara por día y franja: unos minutos de diferencia no cuentan
+    if (ahora?.ok && new Date(ahora.entregaEn).getTime() - cot.entregaEn.getTime() > 59 * 60_000) {
+      return c.json(
+        {
+          mensaje: `La cotización decía que se entregaba ${fraseConFecha({ entregaEn: cot.entregaEn.toISOString(), frase: cot.entregaFrase })}; con la cola de ahora se entrega ${conPunto(fraseConFecha(ahora))} Avísale al cliente antes de crear el pedido.`,
+          campo: 'nuevaFecha',
+          nuevaFecha: fraseConFecha(ahora),
+        },
+        409
+      )
+    }
+  }
+
   const id = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${anio + 100_000})`)
     const [fila] = await tx
@@ -369,21 +402,21 @@ rutasPedidos.post('/', vende, async (c) => {
         requiereAnticipo,
         diasFabricacion: cot.diasFabricacion,
         diasEnvio: cot.diasEnvio,
-        fechaCompromiso: requiereAnticipo
-          ? null
-          : sumarDiasHabiles(new Date(), cot.diasFabricacion + cot.diasEnvio),
+        // Se calcula al final con la cola (o al pagar el anticipo)
+        fechaCompromiso: null,
         notas: cot.notas,
         creadoPor: u.id,
       })
       .returning({ id: pedidos.id })
 
     for (const [orden, l] of lineas.entries()) {
-      // Lo que ya está impreso sale del stock (si alcanza para toda la línea,
-      // y del mismo color si el producto tiene colores)
+      // Lo que ya está impreso sale de existencias (del mismo color si el
+      // producto tiene colores); si no alcanza, se imprime solo lo que falta
       const disponible = l.personalizado
         ? 0
         : await stockDisponible(tx, l.productoId, l.bobinaId)
-      const desdeStock = !l.personalizado && disponible >= l.cantidad
+      const deStock = Math.min(Math.max(0, disponible), l.cantidad)
+      const desdeStock = deStock === l.cantidad
       const [linea] = await tx
         .insert(pedidoLineas)
         .values({
@@ -398,29 +431,32 @@ rutasPedidos.post('/', vende, async (c) => {
           precioVenta: l.precioVenta,
           personalizado: l.personalizado,
           desdeStock,
+          deStock,
+          textos: l.textos,
           bobinaId: l.bobinaId,
           color: l.color,
           colorHex: l.colorHex,
         })
         .returning({ id: pedidoLineas.id })
-      if (desdeStock) {
+      if (deStock > 0) {
         const m = await moverStock(tx, {
           productoId: l.productoId,
           bobinaId: l.bobinaId,
-          cantidad: -l.cantidad,
+          cantidad: -deStock,
           tipo: 'venta',
           nota: `Para el pedido ${codigoPedido(anio, numero)}`,
           pedidoId: nuevo.id,
           usuarioId: u.id,
         })
         if (!m.ok) throw new Error(m.error)
-      } else {
+      }
+      if (!desdeStock) {
         await tx.insert(ordenesProduccion).values({
           pedidoId: nuevo.id,
           lineaId: linea.id,
           productoId: l.productoId,
           colorBobinaId: l.bobinaId,
-          cantidad: l.cantidad,
+          cantidad: l.cantidad - deStock,
           estado: l.personalizado && requiereAnticipo ? 'espera_anticipo' : 'en_cola',
           creadoPor: u.id,
         })
@@ -441,6 +477,12 @@ rutasPedidos.post('/', vende, async (c) => {
       usuarioId: u.id,
     })
     await recalcularPedido(tx, nuevo.id, u.id)
+    // Sin anticipo pendiente, el compromiso queda desde ya
+    const [p] = await tx
+      .select({ fechaCompromiso: pedidos.fechaCompromiso })
+      .from(pedidos)
+      .where(eq(pedidos.id, nuevo.id))
+    if (!p.fechaCompromiso && !requiereAnticipo) await comprometerPedido(tx, nuevo.id)
     return nuevo.id
   })
   return c.json(await responder(id, u), 201)
@@ -546,12 +588,14 @@ rutasPedidos.post('/:id/cancelar', vende, async (c) => {
   await db.transaction(async (tx) => {
     const lineas = await tx.select().from(pedidoLineas).where(eq(pedidoLineas.pedidoId, p.id))
     // Lo que ya estaba impreso (o salió de stock) vuelve al stock
+    // (lo que lleva nombres no vuelve: no se le puede vender a otro)
+    const conNombres = new Set(lineas.filter((l) => l.textos.length).map((l) => l.id))
     const devolver = [
       ...lineas
-        .filter((l) => l.desdeStock)
-        .map((l) => ({ productoId: l.productoId, bobinaId: l.bobinaId, cantidad: l.cantidad })),
+        .filter((l) => l.deStock > 0)
+        .map((l) => ({ productoId: l.productoId, bobinaId: l.bobinaId, cantidad: l.deStock })),
       ...ordenes
-        .filter((o) => o.estado === 'listo')
+        .filter((o) => o.estado === 'listo' && !(o.lineaId && conNombres.has(o.lineaId)))
         .map((o) => ({ productoId: o.productoId, bobinaId: o.colorBobinaId, cantidad: o.cantidad })),
     ]
     for (const d of devolver) {

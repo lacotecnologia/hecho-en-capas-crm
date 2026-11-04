@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { MODALIDADES_INFO } from '@shared/cotizacion'
+import { fechaPrometida } from '@shared/promesa'
 import {
   ESTADO_PARA_CLIENTE,
   type EstadoLineaCliente,
@@ -300,7 +301,9 @@ function Vista({ p }: { p: SeguimientoPublico }) {
                     Fecha estimada de entrega
                   </span>
                   <span className='block font-semibold'>
-                    {formatoFechaLarga(p.fechaCompromiso)}
+                    {p.conHora
+                      ? fechaPrometida(p.fechaCompromiso)
+                      : formatoFechaLarga(p.fechaCompromiso)}
                   </span>
                   <span className='text-sm text-muted-foreground'>
                     {MODALIDADES_INFO[p.modalidad].nombre}
