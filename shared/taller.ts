@@ -120,7 +120,32 @@ export type ProductoResumen = {
   /** Tiempos de la ficha: con ellos se calcula la hora de entrega. */
   tiempos: TiemposProducto
   personalizacion: PersonalizacionProducto
+  /** Cómo sale en la página web (lo maneja el administrador). */
+  web: ProductoWeb
 }
+
+/** Datos de la página web de un producto. */
+export type ProductoWeb = {
+  /** Sale en la página web. */
+  visible: boolean
+  /** Precio al público; null = "Consulta el precio". */
+  precio: number | null
+  /** Sello corto de la tarjeta, ej. "De temporada". */
+  etiqueta: string
+  /** Productos con el mismo grupo salen en una sola tarjeta con botones de tamaño. */
+  grupo: string
+  /** Texto del botón de tamaño, ej. "9 cm". */
+  tamano: string
+}
+
+export const ETIQUETAS_WEB_SUGERIDAS = [
+  'De temporada',
+  'Nuevo',
+  'Más vendido',
+  'A tu medida',
+  'Para tu negocio',
+  'Edición limitada',
+]
 
 export type TiemposProducto = {
   /** Horas de impresión por unidad. */
@@ -573,4 +598,39 @@ export function validarAjusteStock(
     )
   }
   return { ok: true, datos: { cantidad, nota, bobinaId: color.bobinaId } }
+}
+
+/**
+ * Datos de la página web. El precio es opcional (sin precio la web dice
+ * "Consulta el precio"), en miles redondos y nunca menor al precio de fábrica.
+ */
+export function validarWeb(
+  c: Record<string, unknown>,
+  precioFabrica: number
+): Resultado<ProductoWeb> {
+  const visible = c.visible === true
+  const precio = numero(c.precio)
+  if (precio !== null) {
+    if (Number.isNaN(precio) || !Number.isInteger(precio) || precio <= 0) {
+      return malo('Escribe el precio en pesos, sin puntos ni decimales (por ejemplo 45000). Si no tiene precio, deja el campo vacío.', 'precio')
+    }
+    if (precio % 1000 !== 0) {
+      return malo('Escribe el precio en miles redondos (por ejemplo 45000, no 45500).', 'precio')
+    }
+    if (precioFabrica > 0 && precio < precioFabrica) {
+      return malo(
+        `El precio de la web no puede ser menor al precio de fábrica (${precioFabrica.toLocaleString('es-CO')}). Sube el valor o déjalo vacío.`,
+        'precio'
+      )
+    }
+  }
+  const grupo = texto(c.grupo, 60)
+  const tamano = texto(c.tamano, 30)
+  if (grupo && !tamano) {
+    return malo('Escribe el tamaño (por ejemplo "9 cm"): es el botón que el cliente toca para escoger entre los productos del grupo.', 'tamano')
+  }
+  return {
+    ok: true,
+    datos: { visible, precio, etiqueta: texto(c.etiqueta, 24), grupo, tamano: grupo ? tamano : '' },
+  }
 }

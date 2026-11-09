@@ -16,6 +16,7 @@ import {
   type ProductoDetalle,
   type ProductoEntrada,
   type ProductoResumen,
+  type ProductoWeb,
   skuDe,
   validarAjusteStock,
   validarBobina,
@@ -27,7 +28,7 @@ import { ApiError } from '@/lib/api'
 
 export type ProductoDemo = Omit<
   ProductoResumen,
-  'portada' | 'sku' | 'colores' | 'tiempos' | 'personalizacion'
+  'portada' | 'sku' | 'colores' | 'tiempos' | 'personalizacion' | 'web'
 > &
   ProductoCosto & {
     sku: string
@@ -37,6 +38,7 @@ export type ProductoDemo = Omit<
     precioPersonalizar?: number
     /** Colores preaprobados con su stock (solo si escogeColor). */
     coloresStock: { bobinaId: number; stock: number }[]
+    web?: ProductoWeb
   }
 export type ArchivoDemo = ArchivoProducto & { productoId: number }
 
@@ -380,6 +382,7 @@ function resumen(t: TallerDemo, p: ProductoDemo): ProductoResumen {
       minutos: p.minPersonalizar ?? 0,
       precio: p.precioPersonalizar ?? 0,
     },
+    web: p.web ?? { visible: false, precio: null, etiqueta: '', grupo: '', tamano: '' },
   }
 }
 

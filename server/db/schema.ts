@@ -137,6 +137,16 @@ export const productos = pgTable(
     notaAjuste: text('nota_ajuste').notNull().default(''),
     /** Precio con el que trabaja el comercial. */
     precioFabrica: integer('precio_fabrica').notNull().default(0),
+    /** Sale en la página web (lo decide el administrador). */
+    enWeb: boolean('en_web').notNull().default(false),
+    /** Precio al público en la página web (null = "Consulta el precio"). */
+    precioWeb: integer('precio_web'),
+    /** Sello corto de la tarjeta en la web, ej. "De temporada". */
+    etiquetaWeb: text('etiqueta_web').notNull().default(''),
+    /** Productos con el mismo grupo salen en UNA tarjeta con botones de tamaño. */
+    grupoWeb: text('grupo_web').notNull().default(''),
+    /** Texto del botón de tamaño en la web, ej. "9 cm". */
+    tamanoWeb: text('tamano_web').notNull().default(''),
     /** Total de unidades impresas. Con colores, es la suma del stock de cada color. */
     stock: integer('stock').notNull().default(0),
     creadoPor: integer('creado_por').references(() => usuarios.id),

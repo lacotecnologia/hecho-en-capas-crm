@@ -4,6 +4,7 @@ import {
   type Impresora,
   type ProductoDetalle,
   type ProductoResumen,
+  type ProductoWeb,
 } from '@shared/taller'
 import { api } from '@/lib/api'
 
@@ -94,4 +95,17 @@ export function borrarArchivo(id: number, archivoId: number) {
     `/taller/productos/${id}/archivos/${archivoId}`,
     { method: 'DELETE' }
   )
+}
+
+export const consultaGruposWeb = queryOptions({
+  queryKey: ['taller', 'grupos-web'],
+  queryFn: () => api<{ grupos: string[] }>('/taller/grupos-web'),
+  select: (d) => d.grupos,
+})
+
+export function guardarWeb(id: number, datos: ProductoWeb) {
+  return api<{ producto: ProductoDetalle }>(`/taller/productos/${id}/web`, {
+    method: 'PATCH',
+    body: datos,
+  })
 }

@@ -1,5 +1,5 @@
 import { del } from '@vercel/blob'
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { calcularCosto } from '../../shared/costos.js'
 import {
@@ -16,6 +16,7 @@ import {
   validarImpresora,
   validarPrecio,
   validarProducto,
+  validarWeb,
 } from '../../shared/taller.js'
 import { getDb } from '../db/index.js'
 import {
@@ -161,6 +162,13 @@ function resumen(
       maxLetras: p.maxLetras,
       minutos: p.minPersonalizar,
       precio: p.precioPersonalizar,
+    },
+    web: {
+      visible: p.enWeb,
+      precio: p.precioWeb,
+      etiqueta: p.etiquetaWeb,
+      grupo: p.grupoWeb,
+      tamano: p.tamanoWeb,
     },
   }
 }
@@ -386,6 +394,41 @@ rutasTaller.patch('/productos/:id', deTaller, async (c) => {
     )
   }
   return c.json({ producto: await detalle(id, true) })
+})
+
+/** Solo el administrador decide qué sale en la página web y a qué precio. */
+rutasTaller.patch('/productos/:id/web', soloRoles('admin'), async (c) => {
+  const id = idDe(c.req.param('id'))
+  const db = getDb()
+  const [p] = await db
+    .select()
+    .from(productos)
+    .where(and(eq(productos.id, id), isNull(productos.borradoEn)))
+  if (!p) return c.json({ mensaje: NO_EXISTE_PRODUCTO }, 404)
+  const v = validarWeb(await c.req.json().catch(() => ({})), p.precioFabrica)
+  if (!v.ok) return c.json({ mensaje: v.mensaje, campo: v.campo }, 400)
+  await db
+    .update(productos)
+    .set({
+      enWeb: v.datos.visible,
+      precioWeb: v.datos.precio,
+      etiquetaWeb: v.datos.etiqueta,
+      grupoWeb: v.datos.grupo,
+      tamanoWeb: v.datos.tamano,
+      actualizadoEn: new Date(),
+    })
+    .where(eq(productos.id, id))
+  return c.json({ producto: await detalle(id, true) })
+})
+
+/** Nombres de grupo que ya existen, para escoger en vez de escribir. */
+rutasTaller.get('/grupos-web', soloRoles('admin'), async (c) => {
+  const filas = await getDb()
+    .selectDistinct({ grupo: productos.grupoWeb })
+    .from(productos)
+    .where(and(isNull(productos.borradoEn), sql`${productos.grupoWeb} <> ''`))
+    .orderBy(asc(productos.grupoWeb))
+  return c.json({ grupos: filas.map((f) => f.grupo) })
 })
 
 rutasTaller.post('/productos/:id/stock', deTaller, async (c) => {

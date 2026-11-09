@@ -15,6 +15,7 @@ import { rutasPedidos } from './rutas/pedidos.js'
 import { rutasReportes } from './rutas/reportes.js'
 import { rutasSeguimiento } from './rutas/seguimiento.js'
 import { rutasTaller } from './rutas/taller.js'
+import { rutasTienda } from './rutas/tienda.js'
 import { rutasUsuarios } from './rutas/usuarios.js'
 import { type Variables } from './sesion.js'
 
@@ -49,6 +50,8 @@ app.route('/reportes', rutasReportes)
 app.route('/inicio', rutasInicio)
 app.route('/papelera', rutasPapelera)
 app.route('/comisiones', rutasComisiones)
+// Pública: la página web lee de aquí sus productos (sin sesión).
+app.route('/tienda', rutasTienda)
 
 app.notFound((c) => c.json({ mensaje: 'Esta dirección no existe.' }, 404))
 

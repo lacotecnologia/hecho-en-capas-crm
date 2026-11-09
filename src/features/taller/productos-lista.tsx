@@ -150,13 +150,13 @@ export function ProductosLista({ puedeEditar }: { puedeEditar: boolean }) {
             className='group rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring'
           >
             <Card className='h-full gap-0 overflow-hidden py-0 transition-colors group-hover:border-primary'>
-              <div className='aspect-[4/3] bg-muted'>
+              <div className='relative aspect-[4/3] overflow-hidden bg-muted'>
                 {p.portada ? (
                   <img
                     src={p.portada}
                     alt={p.nombre}
                     loading='lazy'
-                    className='size-full object-contain p-2'
+                    className='absolute inset-0 size-full object-contain p-2'
                   />
                 ) : (
                   <div className='flex size-full items-center justify-center text-muted-foreground'>
@@ -175,7 +175,10 @@ export function ProductosLista({ puedeEditar }: { puedeEditar: boolean }) {
                 </p>
                 {p.escogeColor && <PuntosColores colores={p.colores} />}
                 <div className='flex flex-wrap items-center justify-between gap-2'>
-                  <EstadoProductoBadge estado={p.estado} />
+                  <span className='flex flex-wrap items-center gap-1.5'>
+                    <EstadoProductoBadge estado={p.estado} />
+                    {p.web.visible && <Badge variant='outline'>En la web</Badge>}
+                  </span>
                   <span className='text-sm text-muted-foreground tabular-nums'>
                     {p.stock > 0 ? `${p.stock} en stock` : 'Sin stock'}
                   </span>

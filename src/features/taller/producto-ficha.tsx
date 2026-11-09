@@ -85,6 +85,7 @@ import {
 } from './formato'
 import { EstadoProductoBadge } from './productos-lista'
 import { subirArchivo } from './subir-archivo'
+import { TarjetaWeb } from './tarjeta-web'
 
 // ============================================================
 // Entrada: decide si se edita (Taller / Admin) o solo se mira (Comercial)
@@ -210,6 +211,7 @@ function formularioDe(
 }
 
 function Editor({ producto }: { producto: ProductoDetalle | null }) {
+  const esAdmin = tieneRol(useSesion(), ['admin'])
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: config } = useQuery(consultaConfiguracion)
@@ -477,6 +479,9 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
 
           {/* ---------- Fotos y archivos ---------- */}
           <SeccionArchivos producto={producto} />
+
+          {/* ---------- Página web (solo el administrador) ---------- */}
+          {producto && esAdmin && <TarjetaWeb producto={producto} />}
 
           {/* ---------- Cómo se imprime ---------- */}
           <Card>
