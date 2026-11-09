@@ -73,6 +73,7 @@ import {
   consultaImpresoras,
   consultaProducto,
   guardarProducto,
+  guardarWeb,
   marcarPortada,
 } from './api'
 import { MuestraColor } from './bobinas'
@@ -86,6 +87,7 @@ import {
 import { EstadoProductoBadge } from './productos-lista'
 import { subirArchivo } from './subir-archivo'
 import { TarjetaWeb } from './tarjeta-web'
+import { avisoPrecioWeb, datosWeb, formWebDe, webCambio } from './web-form'
 
 // ============================================================
 // Entrada: decide si se edita (Taller / Admin) o solo se mira (Comercial)
@@ -210,6 +212,15 @@ function formularioDe(
   }
 }
 
+/** Falló solo el guardado de la página web (el producto sí se guardó). */
+class ErrorWeb extends Error {
+  original: unknown
+  constructor(original: unknown) {
+    super('pagina web')
+    this.original = original
+  }
+}
+
 function Editor({ producto }: { producto: ProductoDetalle | null }) {
   const esAdmin = tieneRol(useSesion(), ['admin'])
   const navigate = useNavigate()
@@ -272,9 +283,14 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
       : calculo.precioCalculado
   const tope = config?.tope_comercial ?? 25
 
+  // Página web (solo admin): se guarda con el mismo botón, después del producto.
+  const [web, setWeb] = useState(() => formWebDe(producto?.web))
+  const [errorWeb, setErrorWeb] = useState<{ mensaje: string; campo?: string } | null>(null)
+  const avisoWeb = esAdmin && producto ? avisoPrecioWeb(web, producto.precioFabrica) : undefined
+
   const guardar = useMutation({
-    mutationFn: () =>
-      guardarProducto(producto?.id ?? null, {
+    mutationFn: async () => {
+      const r = await guardarProducto(producto?.id ?? null, {
         nombre: f.nombre,
         descripcion: f.descripcion,
         categoria: f.categoria,
@@ -301,8 +317,18 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
         maxLetras: f.maxLetras || 12,
         minPersonalizar: f.minPersonalizar || 0,
         precioPersonalizar: f.precioPersonalizar || 0,
-      }),
+      })
+      if (!esAdmin || !producto || !webCambio(web, r.producto.web)) return r
+      try {
+        return await guardarWeb(producto.id, datosWeb(web))
+      } catch (e) {
+        // El producto sí quedó guardado; solo falló lo de la página web.
+        queryClient.setQueryData(['taller', 'producto', r.producto.id], r)
+        throw new ErrorWeb(e)
+      }
+    },
     onSuccess: ({ producto: guardado }) => {
+      setErrorWeb(null)
       queryClient.setQueryData(['taller', 'producto', guardado.id], {
         producto: guardado,
       })
@@ -318,12 +344,19 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
         toast.success('Cambios guardados.')
       }
     },
-    onError: (e) =>
+    onError: (e) => {
+      if (e instanceof ErrorWeb) {
+        const m = mensajeDeError(e.original)
+        setErrorWeb({ mensaje: m, campo: e.original instanceof ApiError ? e.original.campo : undefined })
+        setError({ mensaje: `Se guardó el producto, pero no los cambios de la página web: ${m}` })
+        return
+      }
       setError(
         e instanceof ApiError
           ? { mensaje: e.message, campo: e.campo }
           : { mensaje: 'No se pudo guardar. Intenta de nuevo.' }
-      ),
+      )
+    },
   })
 
   const impresorasActivas = impresoras.filter(
@@ -481,7 +514,17 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
           <SeccionArchivos producto={producto} />
 
           {/* ---------- Página web (solo el administrador) ---------- */}
-          {producto && esAdmin && <TarjetaWeb producto={producto} />}
+          {producto && esAdmin && (
+            <TarjetaWeb
+              producto={producto}
+              valor={web}
+              onChange={(v) => {
+                setWeb(v)
+                setErrorWeb(null)
+              }}
+              error={errorWeb}
+            />
+          )}
 
           {/* ---------- Cómo se imprime ---------- */}
           <Card>
@@ -888,7 +931,7 @@ function Editor({ producto }: { producto: ProductoDetalle | null }) {
               {error.mensaje}
             </p>
           )}
-          <Button type='submit' size='lg' disabled={guardar.isPending}>
+          <Button type='submit' size='lg' disabled={guardar.isPending || !!avisoWeb}>
             {guardar.isPending ? (
               <Loader2 className='animate-spin' />
             ) : (
