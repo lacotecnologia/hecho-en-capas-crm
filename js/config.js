@@ -7,6 +7,9 @@ export const CONFIG = {
   // Dirección donde la tienda envía los pedidos (la API del CRM). Vacío = los pedidos se guardan solo en este navegador.
   API_PEDIDOS: '',
 
+  // Productos de la tienda: los lee del CRM (Taller → producto → "Página web"). Vacío = usa la lista de data.js.
+  CRM_PRODUCTOS: 'https://hechoencapascrm.vercel.app/api/tienda/productos',
+
   // WhatsApp de la tienda, con indicativo y sin signos (ej. 573001234567). Vacío = no se muestra el botón.
   WHATSAPP: '573116317218',
 

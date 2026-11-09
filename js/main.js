@@ -1,6 +1,7 @@
 import { CONFIG } from './config.js'
-import { PRODUCTOS, CATEGORIAS, COLORES, pesos } from './data.js'
-import { hayWebGL, iniciarPortada, dibujarTarjeta, crearVisor } from './escena.js'
+import { pesos } from './data.js'
+import { cargarCatalogo, filtrosDe } from './catalogo.js'
+import { hayWebGL, iniciarPortada } from './escena.js'
 import { iniciarAnimaciones, revelarTarjetas } from './animaciones.js'
 
 const $ = (s, r = document) => r.querySelector(s)
@@ -12,11 +13,19 @@ const leer = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? d
 const WEBGL = hayWebGL()
 const estado = {
   filtro: 'todo',
-  carrito: leer('hec_tienda_carrito', []).filter((l) => PRODUCTOS.some((p) => p.id === l.id)),
+  tarjetas: [],
+  // Líneas: { tid, vid, color, qty } (tarjeta, variante = producto del CRM, nombre del color)
+  carrito: leer('hec_tienda_carrito2', []),
   usuario: leer('hec_tienda_usuario', null),
   pedidos: leer('hec_tienda_pedidos', []),
 }
-const producto = (id) => PRODUCTOS.find((p) => p.id === id)
+const tarjeta = (tid) => estado.tarjetas.find((t) => t.id === tid)
+function lineaDe(l) {
+  const t = tarjeta(l.tid)
+  const v = t?.variantes.find((x) => x.id === l.vid)
+  return t && v ? { t, v } : null
+}
+const nombreLinea = (t, v) => (v.tamano ? `${t.nombre} · ${v.tamano}` : t.nombre)
 
 /* ---------- Avisos y ventanas ---------- */
 let tAviso
@@ -46,7 +55,7 @@ if (!WEBGL) $('#escena-portada').innerHTML = '<img src="images/icono.png" alt="H
 function pintarFiltros() {
   const cont = $('#filtros')
   cont.innerHTML = ''
-  CATEGORIAS.forEach((c) => {
+  filtrosDe(estado.tarjetas).forEach((c) => {
     const b = document.createElement('button')
     b.type = 'button'
     b.textContent = c.nombre
@@ -56,184 +65,188 @@ function pintarFiltros() {
   })
 }
 
-function colorHex(id) { return COLORES[id]?.hex ?? '#cccccc' }
-const conPrecio = (p) => typeof p.precio === 'number'
-function precioTexto(p) {
-  if (!conPrecio(p)) return '<span class="precio--consulta">Consulta el precio</span>'
-  return (p.personalizado ? '<small class="chico" style="font-weight:500">desde </small>' : '') + pesos(p.precio)
+const conPrecio = (v) => typeof v.precio === 'number'
+const esMedida = (t) => t.variantes.some((v) => v.personalizado)
+function precioTarjeta(t) {
+  const precios = t.variantes.filter(conPrecio).map((v) => v.precio)
+  if (!precios.length) return '<span class="precio--consulta">Consulta el precio</span>'
+  const min = Math.min(...precios)
+  const desde = esMedida(t) || precios.length < t.variantes.length || new Set(precios).size > 1
+  return (desde ? '<small class="chico" style="font-weight:500">desde </small>' : '') + pesos(min)
 }
-function detalleLinea(l) {
-  return [l.color ? COLORES[l.color].nombre : '', l.tam || ''].filter(Boolean).join(' · ')
+function precioVariante(v) {
+  return conPrecio(v) ? (v.personalizado ? 'Desde ' : '') + pesos(v.precio) : 'Consulta el precio'
 }
-function waProducto(p, color, tam, cant) {
-  const extra = [color ? `color ${COLORES[color].nombre}` : '', tam ? `tamaño ${tam}` : '', cant > 1 ? `${cant} unidades` : ''].filter(Boolean).join(', ')
-  const texto = `Hola, me interesa: ${p.nombre}${extra ? ' (' + extra + ')' : ''}. ¿Me das el precio y el tiempo de entrega?`
+function fotoDe(t) {
+  return t.variantes.find((v) => v.fotos.length)?.fotos[0] ?? null
+}
+function coloresTarjeta(t) {
+  const vistos = new Map()
+  t.variantes.forEach((v) => v.colores.forEach((c) => vistos.set(c.nombre, c)))
+  return [...vistos.values()]
+}
+function waProducto(t, v, color, cant) {
+  const extra = [color ? `color ${color}` : '', v.tamano ? `tamaño ${v.tamano}` : '', cant > 1 ? `${cant} unidades` : ''].filter(Boolean).join(', ')
+  const texto = `Hola, me interesa: ${t.nombre}${extra ? ' (' + extra + ')' : ''}. ¿Me das el precio y el tiempo de entrega?`
   return `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(texto)}`
 }
 
 function pintarCatalogo() {
   const rej = $('#rejilla')
   rej.innerHTML = ''
-  PRODUCTOS.filter((p) => estado.filtro === 'todo' || p.categoria === estado.filtro || (estado.filtro === 'medida' && p.personalizado)).forEach((p) => {
-    const foto = p.fotos?.[0]
+  const lista = estado.tarjetas.filter((t) => estado.filtro === 'todo' || t.categoria === estado.filtro || (estado.filtro === 'medida' && esMedida(t)))
+  if (!lista.length) {
+    rej.innerHTML = `<p class="subtitulo" style="grid-column:1/-1">Pronto tendremos productos aquí. Mientras tanto, ${CONFIG.WHATSAPP ? `<a href="https://wa.me/${CONFIG.WHATSAPP}" target="_blank" rel="noopener">escríbenos por WhatsApp</a>` : 'escríbenos'} y te contamos qué podemos hacer.</p>`
+    return
+  }
+  lista.forEach((t) => {
+    const foto = fotoDe(t)
+    const nFotos = new Set(t.variantes.flatMap((v) => v.fotos)).size
+    const colores = coloresTarjeta(t)
     const art = document.createElement('article')
     art.className = 'tarjeta'
     art.innerHTML = `
-      <button class="tarjeta__img" type="button" aria-label="Ver ${esc(p.nombre)}">
-        ${foto ? `<img src="${foto}" alt="${esc(p.nombre)}" loading="lazy" />` : '<canvas width="520" height="390"></canvas>'}
-        <span class="etiqueta">${esc(p.etiqueta)}</span>
-        <span class="tarjeta__ver">${foto ? (p.fotos.length > 1 ? `Ver ${p.fotos.length} fotos` : 'Ver foto') : 'Ver en 3D'}</span>
+      <button class="tarjeta__img" type="button" aria-label="Ver ${esc(t.nombre)}">
+        ${foto ? `<img src="${esc(foto)}" alt="${esc(t.nombre)}" loading="lazy" />` : '<img src="images/icono.png" alt="" style="position:static;width:40%;height:auto;margin:auto;padding:16% 0;object-fit:contain" />'}
+        ${t.etiqueta ? `<span class="etiqueta">${esc(t.etiqueta)}</span>` : ''}
+        ${foto ? `<span class="tarjeta__ver">${nFotos > 1 ? `Ver ${nFotos} fotos` : 'Ver foto'}</span>` : ''}
       </button>
       <div class="tarjeta__cuerpo">
-        <h3>${esc(p.nombre)}</h3>
-        <p class="tarjeta__corto">${esc(p.corto)}</p>
+        <h3>${esc(t.nombre)}</h3>
+        <p class="tarjeta__corto">${esc(t.corto)}</p>
+        ${t.variantes.length > 1 ? `<p class="chico" style="margin:0">${t.variantes.length} tamaños</p>` : ''}
         <div class="tarjeta__pie">
-          <span class="precio">${precioTexto(p)}</span>
-          <span class="mini-colores" aria-label="Colores disponibles">${p.colores.map((c) => `<i style="background:${colorHex(c)}" title="${COLORES[c].nombre}"></i>`).join('')}</span>
+          <span class="precio">${precioTarjeta(t)}</span>
+          <span class="mini-colores" aria-label="Colores disponibles">${colores.map((c) => `<i style="background:${esc(c.hex)}" title="${esc(c.nombre)}"></i>`).join('')}</span>
         </div>
         <button class="btn btn--ancho" type="button" style="margin-top:10px">Ver y pedir</button>
       </div>`
-    const cv = $('canvas', art)
-    const hex = colorHex(p.colores[0])
-    if (!cv) {
-      // tarjeta con foto: nada que dibujar
-    } else if (WEBGL && p.modelo) {
-      dibujarTarjeta(cv, p.modelo, hex)
-      let raf, t0
-      const girar = (t) => {
-        t0 ??= t
-        dibujarTarjeta(cv, p.modelo, hex, -0.5 + (t - t0) / 1200)
-        raf = requestAnimationFrame(girar)
-      }
-      const img = $('.tarjeta__img', art)
-      img.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') { t0 = undefined; raf = requestAnimationFrame(girar) } })
-      img.addEventListener('pointerleave', () => { cancelAnimationFrame(raf); dibujarTarjeta(cv, p.modelo, hex) })
-    } else {
-      cv.replaceWith(Object.assign(new Image(), { src: 'images/icono.png', alt: '', style: 'width:45%;margin:auto;padding:18% 0' }))
-    }
-    $('.tarjeta__img', art).addEventListener('click', () => abrirProducto(p.id))
-    $('.btn', art).addEventListener('click', () => abrirProducto(p.id))
+    $('.tarjeta__img', art).addEventListener('click', () => abrirProducto(t.id))
+    $('.btn', art).addEventListener('click', () => abrirProducto(t.id))
     rej.append(art)
   })
   revelarTarjetas()
 }
 
-/* ---------- Producto (visor 3D) ---------- */
-let visor
-let actual = { id: null, color: null, cant: 1 }
+/* ---------- Producto ---------- */
+let actual = { tid: null, vi: 0, color: null, cant: 1 }
 const dlgProducto = $('#dlg-producto')
+const varianteActual = () => tarjeta(actual.tid).variantes[actual.vi]
 
-function abrirProducto(id) {
-  const p = producto(id)
-  actual = { id, color: p.colores[0] ?? null, tam: p.tamanos?.[0] ?? null, cant: 1 }
-  $('#p-etiqueta').textContent = p.etiqueta
-  $('#p-nombre').textContent = p.nombre
-  $('#p-precio').textContent = conPrecio(p) ? (p.personalizado ? 'Desde ' : '') + pesos(p.precio) : 'Consulta el precio'
-  $('#p-detalle').textContent = p.detalle
-  $('#p-dias').textContent = p.dias ? `Lo fabricamos en unos ${p.dias} días.` : ''
-  $('#p-dias').hidden = !p.dias
-  const nota = $('#p-nota')
-  nota.hidden = !p.personalizado
-  nota.textContent = p.personalizado ? 'Es a tu medida: te mostramos cómo va a quedar antes de fabricarlo y pagas el 50 % para empezar.' : ''
-  pintarTamanos(p)
-  pintarColores(p)
+function abrirProducto(tid) {
+  const t = tarjeta(tid)
+  actual = { tid, vi: 0, color: null, cant: 1 }
+  $('#p-etiqueta').textContent = t.etiqueta
+  $('#p-etiqueta').hidden = !t.etiqueta
+  $('#p-nombre').textContent = t.nombre
+  $('#p-detalle').textContent = t.descripcion
   $('#p-cant').textContent = '1'
-  actualizarWa()
-  const fotos = p.fotos || []
-  $('#p-galeria').hidden = !fotos.length
-  $('#canvas-visor').hidden = !!fotos.length
-  $('.visor__ayuda').hidden = !!fotos.length
-  if (fotos.length) pintarGaleria(p, 0)
+  // Siempre fotos (el visor 3D ya no se usa para productos).
+  $('#canvas-visor').hidden = true
+  $('.visor__ayuda').hidden = true
+  pintarTamanos(t)
+  pintarVariante()
   abrir(dlgProducto)
-  if (WEBGL && !fotos.length && p.modelo) {
-    visor ??= crearVisor($('#canvas-visor'))
-    visor.cargar(p.modelo, colorHex(actual.color))
-    visor.iniciar()
-  }
 }
-function pintarGaleria(p, i) {
+/** Lo que cambia al escoger otro tamaño: precio, fotos, colores, días y nota. */
+function pintarVariante() {
+  const t = tarjeta(actual.tid)
+  const v = varianteActual()
+  if (!v.colores.some((c) => c.nombre === actual.color)) actual.color = v.colores[0]?.nombre ?? null
+  $('#p-precio').textContent = precioVariante(v)
+  $('#p-dias').textContent = v.dias ? `Lo fabricamos en unos ${v.dias} días.` : ''
+  $('#p-dias').hidden = !v.dias
+  const nota = $('#p-nota')
+  nota.hidden = !v.personalizado
+  nota.textContent = v.personalizado ? 'Es a tu medida: te mostramos cómo va a quedar antes de fabricarlo y pagas el 50 % para empezar.' : ''
+  const fotos = v.fotos.length ? v.fotos : t.variantes.find((x) => x.fotos.length)?.fotos ?? []
+  $('#p-galeria').hidden = !fotos.length
+  if (fotos.length) pintarGaleria(t, fotos, 0)
+  pintarColores(v)
+  actualizarWa()
+}
+function pintarGaleria(t, fotos, i) {
   const img = $('#p-foto')
-  img.src = p.fotos[i]
-  img.alt = `${p.nombre}, foto ${i + 1} de ${p.fotos.length}`
+  img.src = fotos[i]
+  img.alt = `${t.nombre}, foto ${i + 1} de ${fotos.length}`
   const mini = $('#p-miniaturas')
   mini.innerHTML = ''
-  mini.hidden = p.fotos.length < 2
-  p.fotos.forEach((f, j) => {
+  mini.hidden = fotos.length < 2
+  fotos.forEach((f, j) => {
     const b = document.createElement('button')
     b.type = 'button'
     b.setAttribute('aria-label', `Ver foto ${j + 1}`)
     b.setAttribute('aria-current', String(i === j))
-    b.innerHTML = `<img src="${f}" alt="" />`
-    b.addEventListener('click', () => pintarGaleria(p, j))
+    b.innerHTML = `<img src="${esc(f)}" alt="" />`
+    b.addEventListener('click', () => pintarGaleria(t, fotos, j))
     mini.append(b)
   })
 }
 function actualizarWa() {
-  const p = producto(actual.id)
-  $('#p-wa').href = waProducto(p, actual.color, actual.tam, actual.cant)
+  $('#p-wa').href = waProducto(tarjeta(actual.tid), varianteActual(), actual.color, actual.cant)
 }
-function pintarTamanos(p) {
+function pintarTamanos(t) {
   const cont = $('#p-tamanos')
   cont.innerHTML = ''
-  $('#p-bloque-tam').hidden = !(p.tamanos && p.tamanos.length)
-  ;(p.tamanos || []).forEach((t) => {
+  $('#p-bloque-tam').hidden = t.variantes.length < 2
+  if (t.variantes.length < 2) return
+  t.variantes.forEach((v, i) => {
     const b = document.createElement('button')
     b.type = 'button'
     b.setAttribute('role', 'radio')
-    b.setAttribute('aria-checked', String(t === actual.tam))
-    b.textContent = t
+    b.setAttribute('aria-checked', String(i === actual.vi))
+    b.textContent = v.tamano || `Opción ${i + 1}`
     b.addEventListener('click', () => {
-      actual.tam = t
+      actual.vi = i
       $$('button', cont).forEach((x) => x.setAttribute('aria-checked', String(x === b)))
-      actualizarWa()
+      pintarVariante()
     })
     cont.append(b)
   })
 }
-function pintarColores(p) {
+function pintarColores(v) {
   const cont = $('#p-colores')
   cont.innerHTML = ''
-  $('#p-bloque-color').hidden = !p.colores.length
-  if (!p.colores.length) return
-  p.colores.forEach((c) => {
+  $('#p-bloque-color').hidden = !v.colores.length
+  if (!v.colores.length) return
+  v.colores.forEach((c) => {
     const b = document.createElement('button')
     b.type = 'button'
     b.setAttribute('role', 'radio')
-    b.setAttribute('aria-checked', String(c === actual.color))
-    b.setAttribute('aria-label', COLORES[c].nombre)
-    b.title = COLORES[c].nombre
-    b.style.background = colorHex(c)
+    b.setAttribute('aria-checked', String(c.nombre === actual.color))
+    b.setAttribute('aria-label', c.nombre)
+    b.title = c.nombre
+    b.style.background = c.hex
     b.addEventListener('click', () => {
-      actual.color = c
-      visor?.pintar(colorHex(c))
+      actual.color = c.nombre
       $$('button', cont).forEach((x) => x.setAttribute('aria-checked', String(x === b)))
-      $('#p-color-nombre').textContent = COLORES[c].nombre
+      $('#p-color-nombre').textContent = c.nombre
       actualizarWa()
     })
     cont.append(b)
   })
-  $('#p-color-nombre').textContent = COLORES[actual.color].nombre
+  $('#p-color-nombre').textContent = actual.color
 }
-dlgProducto.addEventListener('close', () => visor?.detener())
 $('#p-menos').addEventListener('click', () => { actual.cant = Math.max(1, actual.cant - 1); $('#p-cant').textContent = actual.cant; actualizarWa() })
 $('#p-mas').addEventListener('click', () => { actual.cant = Math.min(20, actual.cant + 1); $('#p-cant').textContent = actual.cant; actualizarWa() })
 $('#p-agregar').addEventListener('click', () => {
-  agregar(actual.id, actual.color, actual.tam, actual.cant)
+  const t = tarjeta(actual.tid)
+  const v = varianteActual()
+  agregar(t.id, v.id, actual.color, actual.cant)
   dlgProducto.close()
-  const p = producto(actual.id)
-  aviso(`Agregamos ${actual.cant} × ${p.nombre} a tu pedido`)
+  aviso(`Agregamos ${actual.cant} × ${nombreLinea(t, v)} a tu pedido`)
 })
 
 /* ---------- Carrito ---------- */
-function agregar(id, color, tam, cant) {
-  const l = estado.carrito.find((x) => x.id === id && x.color === color && x.tam === tam)
+function agregar(tid, vid, color, cant) {
+  const l = estado.carrito.find((x) => x.tid === tid && x.vid === vid && x.color === color)
   if (l) l.qty = Math.min(50, l.qty + cant)
-  else estado.carrito.push({ id, color, tam, qty: cant })
+  else estado.carrito.push({ tid, vid, color, qty: cant })
   persistirCarrito()
   const b = $('#btn-carrito')
   b.classList.remove('salto'); void b.offsetWidth; b.classList.add('salto')
 }
-function persistirCarrito() { guardar('hec_tienda_carrito', estado.carrito); pintarContador(); if ($('#dlg-carrito').open) pintarCarrito() }
+function persistirCarrito() { guardar('hec_tienda_carrito2', estado.carrito); pintarContador(); if ($('#dlg-carrito').open) pintarCarrito() }
 function pintarContador() {
   const n = estado.carrito.reduce((a, l) => a + l.qty, 0)
   const el = $('#carrito-n')
@@ -244,16 +257,17 @@ function totales() {
   let total = 0
   let anticipo = 0
   let resto = 0
-  const porCotizar = estado.carrito.some((l) => !conPrecio(producto(l.id)))
+  const lineas = estado.carrito.map(lineaDe).filter(Boolean)
+  const porCotizar = lineas.some(({ v }) => !conPrecio(v))
   estado.carrito.forEach((l) => {
-    const p = producto(l.id)
-    if (!conPrecio(p)) return
-    const v = p.precio * l.qty
-    total += v
-    if (p.personalizado) anticipo += Math.ceil(v / 2 / 1000) * 1000
-    else resto += v
+    const x = lineaDe(l)
+    if (!x || !conPrecio(x.v)) return
+    const valor = x.v.precio * l.qty
+    total += valor
+    if (x.v.personalizado) anticipo += Math.ceil(valor / 2 / 1000) * 1000
+    else resto += valor
   })
-  const hayPers = estado.carrito.some((l) => producto(l.id).personalizado)
+  const hayPers = lineas.some(({ v }) => v.personalizado)
   return { total, hayPers, porCotizar, pagoAhora: hayPers ? resto + anticipo : total, falta: hayPers ? total - (resto + anticipo) : 0 }
 }
 function pintarCarrito() {
@@ -268,18 +282,19 @@ function pintarCarrito() {
   pie.hidden = false
   lista.innerHTML = ''
   estado.carrito.forEach((l, i) => {
-    const p = producto(l.id)
+    const { t, v } = lineaDe(l)
+    const foto = v.fotos[0] || fotoDe(t)
+    const color = v.colores.find((c) => c.nombre === l.color)
     const fila = document.createElement('div')
     fila.className = 'linea'
     fila.innerHTML = `
-      ${p.fotos?.length ? `<img src="${p.fotos[0]}" alt="" />` : '<canvas width="152" height="114"></canvas>'}
+      <img src="${esc(foto || 'images/icono.png')}" alt="" />
       <div>
-        <h4>${esc(p.nombre)}</h4>
-        <small>${l.color ? `<i style="background:${colorHex(l.color)}"></i>` : ''}${esc(detalleLinea(l))}</small>
+        <h4>${esc(t.nombre)}</h4>
+        <small>${color ? `<i style="background:${esc(color.hex)}"></i>` : ''}${esc([l.color, v.tamano].filter(Boolean).join(' · '))}</small>
         <div class="mini-cant"><button type="button" aria-label="Quitar una">−</button><output>${l.qty}</output><button type="button" aria-label="Agregar una">+</button></div>
       </div>
-      <div class="linea__der"><b>${conPrecio(p) ? pesos(p.precio * l.qty) : '<span class="chico">Por cotizar</span>'}</b><button class="linea__quitar" type="button">Quitar</button></div>`
-    if (WEBGL && p.modelo && $('canvas', fila)) dibujarTarjeta($('canvas', fila), p.modelo, colorHex(l.color))
+      <div class="linea__der"><b>${conPrecio(v) ? pesos(v.precio * l.qty) : '<span class="chico">Por cotizar</span>'}</b><button class="linea__quitar" type="button">Quitar</button></div>`
     const [menos, mas] = $$('.mini-cant button', fila)
     menos.addEventListener('click', () => { l.qty = Math.max(1, l.qty - 1); persistirCarrito() })
     mas.addEventListener('click', () => { l.qty = Math.min(50, l.qty + 1); persistirCarrito() })
@@ -434,7 +449,8 @@ async function enviarPedido(e) {
   const form = e.target
   const f = new FormData(form)
   const t = totales()
-  const dias = Math.max(0, ...estado.carrito.map((l) => producto(l.id).dias || 0))
+  const lineas = estado.carrito.map((l) => ({ l, ...lineaDe(l) })).filter((x) => x.t)
+  const dias = Math.max(0, ...lineas.map(({ v }) => v.dias || 0))
   const fecha = dias ? new Date(Date.now() + dias * 86400000) : null
   const pedido = {
     codigo: 'HEC-' + Date.now().toString(36).slice(-5).toUpperCase(),
@@ -449,7 +465,7 @@ async function enviarPedido(e) {
     entrega: String(f.get('entrega')),
     direccion: String(f.get('direccion') || '').trim(),
     nota: String(f.get('nota') || '').trim(),
-    items: estado.carrito.map((l) => ({ id: l.id, nombre: producto(l.id).nombre, color: detalleLinea(l), qty: l.qty, precio: producto(l.id).precio, personalizado: producto(l.id).personalizado })),
+    items: lineas.map(({ l, t, v }) => ({ id: v.id, nombre: t.nombre, color: [l.color, v.tamano].filter(Boolean).join(' · '), qty: l.qty, precio: v.precio, personalizado: v.personalizado })),
     porCotizar: t.porCotizar,
     total: t.total,
     pagoAhora: t.pagoAhora,
@@ -515,7 +531,11 @@ function mensajePedido(p, fechaTxt) {
 }
 
 /* ---------- Arranque ---------- */
-$$('[data-filtro]').forEach((a) => a.addEventListener('click', () => { estado.filtro = a.dataset.filtro; pintarFiltros(); pintarCatalogo() }))
+$$('[data-filtro]').forEach((a) => a.addEventListener('click', () => {
+  estado.filtro = a.dataset.filtro === 'personalizado' ? 'medida' : a.dataset.filtro
+  pintarFiltros()
+  pintarCatalogo()
+}))
 if (CONFIG.WHATSAPP) {
   const a = $('#medida-wa')
   a.hidden = false
@@ -523,8 +543,17 @@ if (CONFIG.WHATSAPP) {
   a.target = '_blank'
   a.rel = 'noopener'
 }
-pintarFiltros()
-pintarCatalogo()
+$('#rejilla').innerHTML = '<p class="subtitulo" style="grid-column:1/-1">Cargando productos…</p>'
 pintarContador()
 pintarUsuario()
 iniciarAnimaciones(controlPortada)
+cargarCatalogo().then(({ tarjetas }) => {
+  estado.tarjetas = tarjetas
+  // Quita del carrito lo que ya no está en la tienda.
+  const antes = estado.carrito.length
+  estado.carrito = estado.carrito.filter((l) => lineaDe(l))
+  if (estado.carrito.length !== antes) persistirCarrito()
+  pintarFiltros()
+  pintarCatalogo()
+  pintarContador()
+})
