@@ -365,3 +365,10 @@ input:focus, select:focus, textarea:focus { outline: 3px solid rgb(0 122 82 / 0.
   .wa-burbuja { right: 14px; bottom: 14px; }
   .wa-boton { width: 56px; height: 56px; }
 }
+
+/* Existencias */
+.tarjeta__extra { margin: 0; font-size: .86rem; color: var(--suave); }
+.disponible { color: var(--verde); font-weight: 700; }
+.disponible::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22a06b; margin-right: 6px; vertical-align: 1px; }
+.visor__dias--listo { color: var(--verde-osc); font-weight: 600; }
+.visor__dias--listo::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #22a06b; margin-right: 8px; vertical-align: 1px; }

@@ -18,7 +18,8 @@ function deLista(p) {
     personalizado: !!p.personalizado,
     dias: p.dias || 0,
     fotos: p.fotos || [],
-    colores: (p.colores || []).map((c) => ({ nombre: COLORES[c].nombre, hex: COLORES[c].hex })),
+    colores: (p.colores || []).map((c) => ({ nombre: COLORES[c].nombre, hex: COLORES[c].hex, stock: 0 })),
+    stock: 0,
   }
   const tamanos = p.tamanos?.length > 1 ? p.tamanos : ['']
   return {
@@ -47,7 +48,8 @@ function deCRM(t) {
       personalizado: !!v.personalizado,
       dias: v.dias || 0,
       fotos: v.fotos || [],
-      colores: v.colores || [],
+      colores: (v.colores || []).map((c) => ({ ...c, stock: c.stock || 0 })),
+      stock: v.stock || 0,
     })),
   }
 }

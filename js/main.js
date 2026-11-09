@@ -115,7 +115,7 @@ function pintarCatalogo() {
       <div class="tarjeta__cuerpo">
         <h3>${esc(t.nombre)}</h3>
         <p class="tarjeta__corto">${esc(t.corto)}</p>
-        ${t.variantes.length > 1 ? `<p class="chico" style="margin:0">${t.variantes.length} tamaños</p>` : ''}
+        ${t.variantes.length > 1 || hayStock(t) ? `<p class="tarjeta__extra">${[t.variantes.length > 1 ? `${t.variantes.length} tamaños` : '', hayStock(t) ? '<span class="disponible">Disponible ya</span>' : ''].filter(Boolean).join(' · ')}</p>` : ''}
         <div class="tarjeta__pie">
           <span class="precio">${precioTarjeta(t)}</span>
           <span class="mini-colores" aria-label="Colores disponibles">${colores.map((c) => `<i style="background:${esc(c.hex)}" title="${esc(c.nombre)}"></i>`).join('')}</span>
@@ -153,10 +153,9 @@ function abrirProducto(tid) {
 function pintarVariante() {
   const t = tarjeta(actual.tid)
   const v = varianteActual()
-  if (!v.colores.some((c) => c.nombre === actual.color)) actual.color = v.colores[0]?.nombre ?? null
+  // Si el color escogido no existe en este tamaño, empieza por uno que esté listo para entregar.
+  if (!v.colores.some((c) => c.nombre === actual.color)) actual.color = (v.colores.find((c) => c.stock > 0) ?? v.colores[0])?.nombre ?? null
   $('#p-precio').textContent = precioVariante(v)
-  $('#p-dias').textContent = v.dias ? `Lo fabricamos en unos ${v.dias} días.` : ''
-  $('#p-dias').hidden = !v.dias
   const nota = $('#p-nota')
   nota.hidden = !v.personalizado
   nota.textContent = v.personalizado ? 'Es a tu medida: te mostramos cómo va a quedar antes de fabricarlo y pagas el 50 % para empezar.' : ''
@@ -164,7 +163,39 @@ function pintarVariante() {
   $('#p-galeria').hidden = !fotos.length
   if (fotos.length) pintarGaleria(t, fotos, 0)
   pintarColores(v)
+  pintarDisponible()
   actualizarWa()
+}
+/** Existencias del tamaño y color escogidos (si escoge color, cada color tiene las suyas). */
+function disponibles(v, color) {
+  if (v.colores.length) return v.colores.find((c) => c.nombre === color)?.stock ?? 0
+  return v.stock || 0
+}
+const hayStock = (t) => t.variantes.some((v) => v.stock > 0 || v.colores.some((c) => c.stock > 0))
+/** "Tenemos 3 listos…" si hay existencias; si no, los días de fabricación. */
+function pintarDisponible() {
+  const v = varianteActual()
+  const n = disponibles(v, actual.color)
+  const el = $('#p-dias')
+  const enColor = v.colores.length && actual.color ? ` en ${actual.color}` : ''
+  const cuando = v.dias ? `en unos ${v.dias} días` : 'y te confirmamos la fecha'
+  const listos = `Tenemos ${n} ${n === 1 ? 'listo' : 'listos'}${enColor}`
+  el.classList.toggle('visor__dias--listo', n > 0)
+  if (n > 0 && actual.cant <= n) {
+    el.textContent = `${listos} para entregar.`
+  } else if (n > 0) {
+    const faltan = actual.cant - n
+    el.textContent = faltan === 1
+      ? `${listos}; el otro lo fabricamos ${cuando}.`
+      : `${listos}; los otros ${faltan} los fabricamos ${cuando}.`
+  } else {
+    const otros = v.colores.filter((c) => c.stock > 0).map((c) => c.nombre)
+    const fabrica = v.dias ? `Lo fabricamos en unos ${v.dias} días.` : ''
+    el.textContent = otros.length
+      ? `${actual.color ? `En ${actual.color} lo fabricamos ${cuando}. ` : ''}Hay listos para entregar en ${otros.length > 1 ? otros.slice(0, -1).join(', ') + ' y ' + otros.at(-1) : otros[0]}.`
+      : fabrica
+  }
+  el.hidden = !el.textContent
 }
 let galeria = { t: null, fotos: [], i: 0 }
 function pintarGaleria(t, fotos, i) {
@@ -250,14 +281,15 @@ function pintarColores(v) {
       actual.color = c.nombre
       $$('button', cont).forEach((x) => x.setAttribute('aria-checked', String(x === b)))
       $('#p-color-nombre').textContent = c.nombre
+      pintarDisponible()
       actualizarWa()
     })
     cont.append(b)
   })
   $('#p-color-nombre').textContent = actual.color
 }
-$('#p-menos').addEventListener('click', () => { actual.cant = Math.max(1, actual.cant - 1); $('#p-cant').textContent = actual.cant; actualizarWa() })
-$('#p-mas').addEventListener('click', () => { actual.cant = Math.min(20, actual.cant + 1); $('#p-cant').textContent = actual.cant; actualizarWa() })
+$('#p-menos').addEventListener('click', () => { actual.cant = Math.max(1, actual.cant - 1); $('#p-cant').textContent = actual.cant; pintarDisponible(); actualizarWa() })
+$('#p-mas').addEventListener('click', () => { actual.cant = Math.min(20, actual.cant + 1); $('#p-cant').textContent = actual.cant; pintarDisponible(); actualizarWa() })
 $('#p-agregar').addEventListener('click', () => {
   const t = tarjeta(actual.tid)
   const v = varianteActual()
