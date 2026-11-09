@@ -1,6 +1,7 @@
 import { CONFIG } from './config.js'
 import { pesos } from './data.js'
 import { cargarCatalogo, filtrosDe } from './catalogo.js'
+import { pintarCarrusel } from './carrusel.js'
 import { hayWebGL, iniciarPortada } from './escena.js'
 import { iniciarAnimaciones, revelarTarjetas } from './animaciones.js'
 
@@ -165,13 +166,20 @@ function pintarVariante() {
   pintarColores(v)
   actualizarWa()
 }
+let galeria = { t: null, fotos: [], i: 0 }
 function pintarGaleria(t, fotos, i) {
+  galeria = { t, fotos, i }
   const img = $('#p-foto')
   img.src = fotos[i]
   img.alt = `${t.nombre}, foto ${i + 1} de ${fotos.length}`
+  const varias = fotos.length > 1
+  $('#p-foto-ant').hidden = !varias
+  $('#p-foto-sig').hidden = !varias
+  $('#p-foto-n').hidden = !varias
+  $('#p-foto-n').textContent = `${i + 1} / ${fotos.length}`
   const mini = $('#p-miniaturas')
   mini.innerHTML = ''
-  mini.hidden = fotos.length < 2
+  mini.hidden = !varias
   fotos.forEach((f, j) => {
     const b = document.createElement('button')
     b.type = 'button'
@@ -182,6 +190,27 @@ function pintarGaleria(t, fotos, i) {
     mini.append(b)
   })
 }
+const moverFoto = (d) => {
+  if (galeria.fotos.length < 2) return
+  pintarGaleria(galeria.t, galeria.fotos, (galeria.i + d + galeria.fotos.length) % galeria.fotos.length)
+}
+$('#p-foto-ant').addEventListener('click', () => moverFoto(-1))
+$('#p-foto-sig').addEventListener('click', () => moverFoto(1))
+dlgProducto.addEventListener('keydown', (e) => {
+  if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return
+  if (e.key === 'ArrowRight') moverFoto(1)
+  if (e.key === 'ArrowLeft') moverFoto(-1)
+})
+// Deslizar con el dedo sobre la foto.
+let toque = null
+$('#p-foto').addEventListener('touchstart', (e) => { toque = e.touches[0].clientX }, { passive: true })
+$('#p-foto').addEventListener('touchend', (e) => {
+  if (toque === null) return
+  const dx = e.changedTouches[0].clientX - toque
+  toque = null
+  if (Math.abs(dx) > 40) moverFoto(dx < 0 ? 1 : -1)
+})
+
 function actualizarWa() {
   $('#p-wa').href = waProducto(tarjeta(actual.tid), varianteActual(), actual.color, actual.cant)
 }
@@ -556,4 +585,5 @@ cargarCatalogo().then(({ tarjetas }) => {
   pintarFiltros()
   pintarCatalogo()
   pintarContador()
+  pintarCarrusel($('#destacados'), estado.tarjetas, { precio: precioTarjeta, foto: fotoDe, onVer: abrirProducto })
 })

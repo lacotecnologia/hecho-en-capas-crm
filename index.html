@@ -94,6 +94,7 @@
 
       <section class="tienda" id="tienda">
         <div class="contenedor">
+          <div class="carrusel" id="destacados" role="region" aria-roledescription="carrusel" aria-label="Productos destacados" hidden></div>
           <div class="tienda__cab">
             <div>
               <h2 class="titulo">Nuestros productos</h2>
@@ -150,7 +151,16 @@
           <canvas id="canvas-visor" aria-label="Modelo 3D del producto, arrástralo para girarlo"></canvas>
           <p class="visor__ayuda">Arrastra para girarlo</p>
           <div class="galeria" id="p-galeria" hidden>
-            <img id="p-foto" alt="" />
+            <div class="galeria__foto">
+              <img id="p-foto" alt="" />
+              <button class="galeria__flecha galeria__flecha--ant" id="p-foto-ant" type="button" aria-label="Foto anterior">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <button class="galeria__flecha galeria__flecha--sig" id="p-foto-sig" type="button" aria-label="Foto siguiente">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+              <span class="galeria__contador" id="p-foto-n" aria-live="polite"></span>
+            </div>
             <div class="galeria__miniaturas" id="p-miniaturas"></div>
           </div>
         </div>
@@ -219,6 +229,7 @@
 
     <div class="aviso-flotante" id="aviso" role="status" aria-live="polite" hidden></div>
 
+    <script type="module" src="js/whatsapp.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js"></script>
     <script type="module" src="js/main.js"></script>

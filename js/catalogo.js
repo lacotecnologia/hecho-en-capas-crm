@@ -52,7 +52,17 @@ function deCRM(t) {
   }
 }
 
-/** Devuelve { tarjetas, origen: 'crm' | 'lista' }. */
+const sinTildes = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+/** Edición limitada primero, luego Más vendido, luego el resto (en su orden). */
+const PRIORIDAD = ['edicion limitada', 'mas vendido']
+export function prioridad(t) {
+  const i = PRIORIDAD.indexOf(sinTildes(t.etiqueta))
+  return i === -1 ? PRIORIDAD.length : i
+}
+export const esDestacado = (t) => prioridad(t) < PRIORIDAD.length
+const ordenar = (tarjetas) => tarjetas.map((t, i) => [t, i]).sort((a, b) => prioridad(a[0]) - prioridad(b[0]) || a[1] - b[1]).map(([t]) => t)
+
+/** Devuelve { tarjetas, origen: 'crm' | 'lista' }, ya ordenadas. */
 export async function cargarCatalogo() {
   if (CONFIG.CRM_PRODUCTOS) {
     const ctrl = new AbortController()
@@ -62,14 +72,14 @@ export async function cargarCatalogo() {
       if (!r.ok) throw new Error(`CRM ${r.status}`)
       const datos = await r.json()
       if (!Array.isArray(datos.productos)) throw new Error('respuesta rara')
-      return { tarjetas: datos.productos.map(deCRM), origen: 'crm' }
+      return { tarjetas: ordenar(datos.productos.map(deCRM)), origen: 'crm' }
     } catch (e) {
       console.warn('[tienda] No se pudo leer el CRM; se muestra la lista guardada.', e)
     } finally {
       clearTimeout(espera)
     }
   }
-  return { tarjetas: PRODUCTOS.map(deLista), origen: 'lista' }
+  return { tarjetas: ordenar(PRODUCTOS.map(deLista)), origen: 'lista' }
 }
 
 /** Filtros en el orden en que aparecen las categorías, más "A tu medida" si aplica. */
