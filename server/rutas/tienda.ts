@@ -32,7 +32,10 @@ export type VarianteWeb = {
   personalizado: boolean
   dias: number
   fotos: string[]
-  colores: { nombre: string; hex: string }[]
+  /** Si el producto escoge color, `stock` de cada color; si no, va en `stock` de la variante. */
+  colores: { nombre: string; hex: string; stock: number }[]
+  /** Unidades ya impresas listas para entregar (0 en lo personalizado). */
+  stock: number
   enStock: boolean
 }
 
@@ -78,6 +81,8 @@ rutasTienda.get('/productos', async (c) => {
   // Un grupo = una tarjeta con botones de tamaño. Sin grupo = una tarjeta propia.
   const tarjetas = new Map<string, TarjetaWeb>()
   for (const p of filas) {
+    // Lo personalizado (con nombre o hecho a la medida) nunca sale de existencias.
+    const conStock = p.tipo === 'catalogo' && !p.personalizaTexto
     const clave = p.grupoWeb ? `g:${p.grupoWeb.toLowerCase()}` : `p:${p.id}`
     const variante: VarianteWeb = {
       id: p.id,
@@ -90,8 +95,9 @@ rutasTienda.get('/productos', async (c) => {
       fotos: fotosDe.get(p.id) ?? [],
       colores: (colores.get(p.id) ?? [])
         .filter((x) => x.activa)
-        .map((x) => ({ nombre: x.color, hex: x.colorHex })),
-      enStock: p.tipo === 'catalogo' && p.stock > 0,
+        .map((x) => ({ nombre: x.color, hex: x.colorHex, stock: conStock ? Math.max(0, x.stock) : 0 })),
+      stock: conStock ? Math.max(0, p.stock) : 0,
+      enStock: conStock && p.stock > 0,
     }
     const t = tarjetas.get(clave)
     if (t) {
