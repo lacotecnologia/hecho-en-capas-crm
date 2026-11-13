@@ -14,9 +14,6 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
-    <script type="importmap">
-      { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/controls/" } }
-    </script>
   </head>
   <body>
     <a class="saltar" href="#tienda">Ir a los productos</a>
@@ -74,8 +71,8 @@
             </ul>
           </div>
           <div class="portada__escena" id="escena-portada">
-            <canvas id="canvas-portada" aria-label="Un florero que se va imprimiendo capa por capa"></canvas>
-            <p class="escena__pie">Así se imprime: una capa a la vez</p>
+            <div class="carrusel carrusel--portada" id="carrusel-portada" role="region" aria-roledescription="carrusel" aria-label="Nuestros productos" hidden></div>
+            <div class="portada__espera" id="portada-espera"><img src="images/icono.png" alt="Hecho en Capas" /></div>
           </div>
         </div>
       </section>
@@ -94,7 +91,6 @@
 
       <section class="tienda" id="tienda">
         <div class="contenedor">
-          <div class="carrusel" id="destacados" role="region" aria-roledescription="carrusel" aria-label="Productos destacados" hidden></div>
           <div class="tienda__cab">
             <div>
               <h2 class="titulo">Nuestros productos</h2>

@@ -2,7 +2,6 @@ import { CONFIG } from './config.js'
 import { pesos } from './data.js'
 import { cargarCatalogo, filtrosDe } from './catalogo.js'
 import { pintarCarrusel } from './carrusel.js'
-import { hayWebGL, iniciarPortada } from './escena.js'
 import { iniciarAnimaciones, revelarTarjetas } from './animaciones.js'
 
 const $ = (s, r = document) => r.querySelector(s)
@@ -11,7 +10,6 @@ const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch {} }
 const leer = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def } catch { return def } }
 
-const WEBGL = hayWebGL()
 const estado = {
   filtro: 'todo',
   tarjetas: [],
@@ -48,9 +46,6 @@ $$('dialog').forEach((d) => {
   })
 })
 
-/* ---------- Portada 3D ---------- */
-const controlPortada = WEBGL ? iniciarPortada($('#canvas-portada')) : null
-if (!WEBGL) $('#escena-portada').innerHTML = '<img src="images/icono.png" alt="Hecho en Capas" style="margin:auto;width:60%;max-width:280px" />'
 
 /* ---------- Catálogo ---------- */
 function pintarFiltros() {
@@ -607,7 +602,7 @@ if (CONFIG.WHATSAPP) {
 $('#rejilla').innerHTML = '<p class="subtitulo" style="grid-column:1/-1">Cargando productos…</p>'
 pintarContador()
 pintarUsuario()
-iniciarAnimaciones(controlPortada)
+iniciarAnimaciones()
 cargarCatalogo().then(({ tarjetas }) => {
   estado.tarjetas = tarjetas
   // Quita del carrito lo que ya no está en la tienda.
@@ -617,5 +612,7 @@ cargarCatalogo().then(({ tarjetas }) => {
   pintarFiltros()
   pintarCatalogo()
   pintarContador()
-  pintarCarrusel($('#destacados'), estado.tarjetas, { precio: precioTarjeta, foto: fotoDe, onVer: abrirProducto })
+  // Portada: carrusel automático con todos los productos (Edición limitada y Más vendido primero).
+  pintarCarrusel($('#carrusel-portada'), estado.tarjetas, { precio: precioTarjeta, foto: fotoDe, onVer: abrirProducto, max: Infinity })
+  $('#portada-espera').hidden = !$('#carrusel-portada').hidden
 })

@@ -21,8 +21,7 @@ export function revelarTarjetas() {
   ScrollTrigger.refresh()
 }
 
-/** `portada` es el control de la escena 3D (ver escena.js). */
-export function iniciarAnimaciones(portada) {
+export function iniciarAnimaciones() {
   if (!hayAnimaciones) return
   gsap.registerPlugin(ScrollTrigger)
 
@@ -32,44 +31,6 @@ export function iniciarAnimaciones(portada) {
     .from('.barra', { yPercent: -100, duration: 0.6 })
     .from('.portada__texto > *', { y: 36, opacity: 0, duration: 0.7, stagger: 0.09 }, '-=0.3')
     .from('#escena-portada', { scale: 0.88, opacity: 0, duration: 1, ease: 'back.out(1.4)' }, '-=0.9')
-
-  /* 2. El florero se imprime mientras bajas por la página */
-  const base = { v: 0 }
-  const pie = document.querySelector('.escena__pie')
-  if (portada) {
-    portada.manual = true
-    portada.p = 0
-    // primero empieza solo, hasta un 35 %
-    gsap.to(base, {
-      v: 0.35,
-      duration: 2.4,
-      ease: 'power2.inOut',
-      delay: 0.5,
-      onUpdate: () => (portada.p = base.v),
-    })
-    ScrollTrigger.create({
-      trigger: '.portada',
-      start: 'top 68px',
-      end: '+=110%',
-      pin: true,
-      scrub: 0.7,
-      onUpdate: (self) => {
-        const sp = self.progress
-        const p = base.v + sp * (1 - base.v)
-        portada.p = p
-        portada.giro = sp * Math.PI * 1.4
-        portada.zoom = sp * 1.5
-        portada.alto = -sp * 0.5
-        if (pie) pie.textContent = p >= 0.995 ? '¡Listo! Así se hace cada producto' : `Imprimiendo… ${Math.round(p * 100)} %`
-      },
-    })
-    gsap.to('.portada__texto', {
-      opacity: 0.2,
-      y: -24,
-      ease: 'none',
-      scrollTrigger: { trigger: '.portada', start: 'top 68px', end: '+=110%', scrub: true },
-    })
-  }
 
   /* 3. Secciones */
   const aparecer = (selector, opciones = {}) => {

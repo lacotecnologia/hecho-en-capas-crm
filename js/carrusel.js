@@ -1,4 +1,4 @@
-// Carrusel de destacados: fotos grandes de los productos, con "Edición limitada"
+// Carrusel de la portada: fotos grandes de todos los productos, con "Edición limitada"
 // y "Más vendido" de primeros (las tarjetas ya llegan ordenadas).
 // Se desliza con el dedo, con flechas o con los puntos; avanza solo cada 5 s
 // (se detiene al pasar el mouse, al tocarlo o si la persona pidió menos movimiento).
@@ -10,7 +10,7 @@ export function pintarCarrusel(cont, tarjetas, { precio, foto, onVer, max = 10 }
   cont.hidden = lista.length < 2
   if (cont.hidden) return
   cont.innerHTML = `
-    <div class="carrusel__pista" tabindex="0" aria-label="Productos destacados. Usa las flechas para moverte.">
+    <div class="carrusel__pista" tabindex="0" aria-label="Nuestros productos. Usa las flechas para moverte.">
       ${lista
         .map(
           (t, i) => `
@@ -36,9 +36,13 @@ export function pintarCarrusel(cont, tarjetas, { precio, foto, onVer, max = 10 }
     <button class="carrusel__flecha carrusel__flecha--sig" type="button" aria-label="Siguiente">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
     </button>
-    <div class="carrusel__puntos" role="group" aria-label="Escoger diapositiva">
+    ${
+      lista.length > 8
+        ? `<div class="carrusel__avance" aria-live="polite"><span class="carrusel__barra"><i></i></span><span class="carrusel__n"></span></div>`
+        : `<div class="carrusel__puntos" role="group" aria-label="Escoger diapositiva">
       ${lista.map((t, i) => `<button type="button" aria-label="Ir a ${esc(t.nombre)}" data-i="${i}"></button>`).join('')}
     </div>`
+    }`
 
   const pista = cont.querySelector('.carrusel__pista')
   const slides = [...cont.querySelectorAll('.carrusel__slide')]
@@ -55,7 +59,13 @@ export function pintarCarrusel(cont, tarjetas, { precio, foto, onVer, max = 10 }
   }
   const marcar = () => {
     const i = actual()
+    cont.dataset.actual = String(i)
     puntos.forEach((p, j) => p.setAttribute('aria-current', String(i === j)))
+    const n = cont.querySelector('.carrusel__n')
+    if (n) {
+      n.textContent = `${i + 1} / ${slides.length}`
+      cont.querySelector('.carrusel__barra i').style.width = `${((i + 1) / slides.length) * 100}%`
+    }
   }
   let espera
   pista.addEventListener('scroll', () => { clearTimeout(espera); espera = setTimeout(marcar, 80) }, { passive: true })
