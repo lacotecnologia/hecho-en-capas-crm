@@ -583,4 +583,49 @@ export const comisiones = pgTable(
   ]
 )
 
+/**
+ * Cuentas de cobro (para clientes que piden ese documento). Una vigente por
+ * pedido; se anulan, nunca se borran, y el número no se repite.
+ * `datos` guarda la foto del documento tal como se expidió (CuentaCobro).
+ */
+export const cuentasCobro = pgTable(
+  'cuentas_cobro',
+  {
+    id: serial('id').primaryKey(),
+    numero: integer('numero').notNull().unique(),
+    codigo: text('codigo').notNull().unique(),
+    pedidoId: integer('pedido_id')
+      .notNull()
+      .references(() => pedidos.id),
+    clienteId: integer('cliente_id')
+      .notNull()
+      .references(() => clientes.id),
+    /** AAAA-MM-DD en hora de Colombia. */
+    fecha: text('fecha').notNull(),
+    total: integer('total').notNull(),
+    pagador: text('pagador').notNull(),
+    /** vigente | anulada */
+    estado: text('estado').notNull().default('vigente'),
+    datos: jsonb('datos').notNull(),
+    /** Clave del enlace que se manda al cliente (/cuenta-de-cobro/<token>). */
+    token: text('token').notNull().unique(),
+    /** Se mandó por WhatsApp (o se copió el enlace). */
+    enviadaEn: timestamp('enviada_en', { withTimezone: true }),
+    /** El cliente abrió el enlace. */
+    recibidaEn: timestamp('recibida_en', { withTimezone: true }),
+    /** El cliente la descargó: se toma como aceptada. */
+    aceptadaEn: timestamp('aceptada_en', { withTimezone: true }),
+    motivoAnulacion: text('motivo_anulacion').notNull().default(''),
+    anuladaEn: timestamp('anulada_en', { withTimezone: true }),
+    anuladaPor: integer('anulada_por').references(() => usuarios.id),
+    creadoPor: integer('creado_por').references(() => usuarios.id),
+    creadoEn: creadoEn(),
+  },
+  (t) => [
+    uniqueIndex('cuentas_cobro_vigente_idx')
+      .on(t.pedidoId)
+      .where(sql`${t.estado} = 'vigente'`),
+  ]
+)
+
 export type Usuario = typeof usuarios.$inferSelect

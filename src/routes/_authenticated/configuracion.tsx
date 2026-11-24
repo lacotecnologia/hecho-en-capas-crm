@@ -5,7 +5,7 @@ import { Configuracion } from '@/features/configuracion'
 
 export const Route = createFileRoute('/_authenticated/configuracion')({
   validateSearch: z.object({
-    pestana: z.enum(['valores', 'entregas']).optional(),
+    pestana: z.enum(['valores', 'entregas', 'cuenta-cobro']).optional(),
   }),
   beforeLoad: ({ context }) => exigirRoles(context.queryClient, ['admin']),
   component: Configuracion,

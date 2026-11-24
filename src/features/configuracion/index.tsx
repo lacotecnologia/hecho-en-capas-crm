@@ -25,6 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Pagina } from '@/components/layout/pagina'
+import { DatosCuentaCobro } from '@/features/cuentas-cobro/datos'
 import { AgendaEntregas } from './agenda'
 import {
   type ConfiguracionCompleta,
@@ -57,21 +58,27 @@ export function Configuracion() {
         value={pestana}
         onValueChange={(v) =>
           navigate({
-            search: { pestana: v as 'valores' | 'entregas' },
+            search: {
+              pestana: v as 'valores' | 'entregas' | 'cuenta-cobro',
+            },
             replace: true,
           })
         }
         className='gap-4'
       >
-        <TabsList>
+        <TabsList className='h-auto max-w-full flex-wrap justify-start'>
           <TabsTrigger value='valores'>Valores del negocio</TabsTrigger>
           <TabsTrigger value='entregas'>Horarios y entregas</TabsTrigger>
+          <TabsTrigger value='cuenta-cobro'>Cuenta de cobro</TabsTrigger>
         </TabsList>
         <TabsContent value='valores'>
           <ValoresNegocio />
         </TabsContent>
         <TabsContent value='entregas'>
           <AgendaEntregas />
+        </TabsContent>
+        <TabsContent value='cuenta-cobro'>
+          <DatosCuentaCobro />
         </TabsContent>
       </Tabs>
     </Pagina>

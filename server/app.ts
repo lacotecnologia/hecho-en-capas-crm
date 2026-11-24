@@ -5,6 +5,7 @@ import { rutasAuth } from './rutas/auth.js'
 import { rutasClientes } from './rutas/clientes.js'
 import { rutasCobros } from './rutas/cobros.js'
 import { rutasCola } from './rutas/cola.js'
+import { rutasCuentaPublica, rutasCuentasCobro } from './rutas/cuentas-cobro.js'
 import { rutasConfiguracion } from './rutas/configuracion.js'
 import { rutasCotizaciones } from './rutas/cotizaciones.js'
 import { rutasEntregas } from './rutas/entregas.js'
@@ -50,6 +51,9 @@ app.route('/reportes', rutasReportes)
 app.route('/inicio', rutasInicio)
 app.route('/papelera', rutasPapelera)
 app.route('/comisiones', rutasComisiones)
+app.route('/cuentas-cobro', rutasCuentasCobro)
+// Pública: el cliente abre la cuenta de cobro con su enlace (sin sesión).
+app.route('/cuenta-de-cobro', rutasCuentaPublica)
 // Pública: la página web lee de aquí sus productos (sin sesión).
 app.route('/tienda', rutasTienda)
 

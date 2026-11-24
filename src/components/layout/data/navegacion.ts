@@ -15,6 +15,7 @@ import {
   Trash2,
   HandCoins,
   BookOpen,
+  FileSignature,
 } from 'lucide-react'
 
 export type ItemMenu = {
@@ -88,6 +89,14 @@ export const MENU: GrupoMenu[] = [
         icono: Wallet,
         descripcion: 'Anticipos, abonos y saldos por cobrar',
         roles: ['admin', 'comercial'],
+      },
+      {
+        titulo: 'Cuentas de cobro',
+        url: '/cuentas-cobro',
+        icono: FileSignature,
+        descripcion: 'Las que pidieron los clientes y si ya las abrieron o descargaron',
+        roles: ['admin'],
+        ocultarEnPrueba: true,
       },
       {
         titulo: 'Comisiones',

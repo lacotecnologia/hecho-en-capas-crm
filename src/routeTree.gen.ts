@@ -14,11 +14,13 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as SeguimientoIndexRouteImport } from './routes/seguimiento/index'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as SeguimientoCodigoRouteImport } from './routes/seguimiento/$codigo'
+import { Route as CuentaDeCobroTokenRouteImport } from './routes/cuenta-de-cobro/$token'
 import { Route as AuthenticatedReportesRouteImport } from './routes/_authenticated/reportes'
 import { Route as AuthenticatedPersonasRouteImport } from './routes/_authenticated/personas'
 import { Route as AuthenticatedPapeleraRouteImport } from './routes/_authenticated/papelera'
 import { Route as AuthenticatedManualRouteImport } from './routes/_authenticated/manual'
 import { Route as AuthenticatedEntregasRouteImport } from './routes/_authenticated/entregas'
+import { Route as AuthenticatedCuentasCobroRouteImport } from './routes/_authenticated/cuentas-cobro'
 import { Route as AuthenticatedConfiguracionRouteImport } from './routes/_authenticated/configuracion'
 import { Route as AuthenticatedComisionesRouteImport } from './routes/_authenticated/comisiones'
 import { Route as AuthenticatedColaRouteImport } from './routes/_authenticated/cola'
@@ -60,6 +62,11 @@ const SeguimientoCodigoRoute = SeguimientoCodigoRouteImport.update({
   path: '/seguimiento/$codigo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CuentaDeCobroTokenRoute = CuentaDeCobroTokenRouteImport.update({
+  id: '/cuenta-de-cobro/$token',
+  path: '/cuenta-de-cobro/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedReportesRoute = AuthenticatedReportesRouteImport.update({
   id: '/reportes',
   path: '/reportes',
@@ -85,6 +92,12 @@ const AuthenticatedEntregasRoute = AuthenticatedEntregasRouteImport.update({
   path: '/entregas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCuentasCobroRoute =
+  AuthenticatedCuentasCobroRouteImport.update({
+    id: '/cuentas-cobro',
+    path: '/cuentas-cobro',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedConfiguracionRoute =
   AuthenticatedConfiguracionRouteImport.update({
     id: '/configuracion',
@@ -184,11 +197,13 @@ export interface FileRoutesByFullPath {
   '/cola': typeof AuthenticatedColaRoute
   '/comisiones': typeof AuthenticatedComisionesRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
+  '/cuentas-cobro': typeof AuthenticatedCuentasCobroRoute
   '/entregas': typeof AuthenticatedEntregasRoute
   '/manual': typeof AuthenticatedManualRoute
   '/papelera': typeof AuthenticatedPapeleraRoute
   '/personas': typeof AuthenticatedPersonasRoute
   '/reportes': typeof AuthenticatedReportesRoute
+  '/cuenta-de-cobro/$token': typeof CuentaDeCobroTokenRoute
   '/seguimiento/$codigo': typeof SeguimientoCodigoRoute
   '/seguimiento/': typeof SeguimientoIndexRoute
   '/cotizar/$id': typeof AuthenticatedCotizarIdRoute
@@ -210,11 +225,13 @@ export interface FileRoutesByTo {
   '/cola': typeof AuthenticatedColaRoute
   '/comisiones': typeof AuthenticatedComisionesRoute
   '/configuracion': typeof AuthenticatedConfiguracionRoute
+  '/cuentas-cobro': typeof AuthenticatedCuentasCobroRoute
   '/entregas': typeof AuthenticatedEntregasRoute
   '/manual': typeof AuthenticatedManualRoute
   '/papelera': typeof AuthenticatedPapeleraRoute
   '/personas': typeof AuthenticatedPersonasRoute
   '/reportes': typeof AuthenticatedReportesRoute
+  '/cuenta-de-cobro/$token': typeof CuentaDeCobroTokenRoute
   '/seguimiento/$codigo': typeof SeguimientoCodigoRoute
   '/': typeof AuthenticatedIndexRoute
   '/seguimiento': typeof SeguimientoIndexRoute
@@ -239,11 +256,13 @@ export interface FileRoutesById {
   '/_authenticated/cola': typeof AuthenticatedColaRoute
   '/_authenticated/comisiones': typeof AuthenticatedComisionesRoute
   '/_authenticated/configuracion': typeof AuthenticatedConfiguracionRoute
+  '/_authenticated/cuentas-cobro': typeof AuthenticatedCuentasCobroRoute
   '/_authenticated/entregas': typeof AuthenticatedEntregasRoute
   '/_authenticated/manual': typeof AuthenticatedManualRoute
   '/_authenticated/papelera': typeof AuthenticatedPapeleraRoute
   '/_authenticated/personas': typeof AuthenticatedPersonasRoute
   '/_authenticated/reportes': typeof AuthenticatedReportesRoute
+  '/cuenta-de-cobro/$token': typeof CuentaDeCobroTokenRoute
   '/seguimiento/$codigo': typeof SeguimientoCodigoRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/seguimiento/': typeof SeguimientoIndexRoute
@@ -269,11 +288,13 @@ export interface FileRouteTypes {
     | '/cola'
     | '/comisiones'
     | '/configuracion'
+    | '/cuentas-cobro'
     | '/entregas'
     | '/manual'
     | '/papelera'
     | '/personas'
     | '/reportes'
+    | '/cuenta-de-cobro/$token'
     | '/seguimiento/$codigo'
     | '/seguimiento/'
     | '/cotizar/$id'
@@ -295,11 +316,13 @@ export interface FileRouteTypes {
     | '/cola'
     | '/comisiones'
     | '/configuracion'
+    | '/cuentas-cobro'
     | '/entregas'
     | '/manual'
     | '/papelera'
     | '/personas'
     | '/reportes'
+    | '/cuenta-de-cobro/$token'
     | '/seguimiento/$codigo'
     | '/'
     | '/seguimiento'
@@ -323,11 +346,13 @@ export interface FileRouteTypes {
     | '/_authenticated/cola'
     | '/_authenticated/comisiones'
     | '/_authenticated/configuracion'
+    | '/_authenticated/cuentas-cobro'
     | '/_authenticated/entregas'
     | '/_authenticated/manual'
     | '/_authenticated/papelera'
     | '/_authenticated/personas'
     | '/_authenticated/reportes'
+    | '/cuenta-de-cobro/$token'
     | '/seguimiento/$codigo'
     | '/_authenticated/'
     | '/seguimiento/'
@@ -348,6 +373,7 @@ export interface RootRouteChildren {
   errors404Route: typeof errors404Route
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
+  CuentaDeCobroTokenRoute: typeof CuentaDeCobroTokenRoute
   SeguimientoCodigoRoute: typeof SeguimientoCodigoRoute
   SeguimientoIndexRoute: typeof SeguimientoIndexRoute
 }
@@ -389,6 +415,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SeguimientoCodigoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cuenta-de-cobro/$token': {
+      id: '/cuenta-de-cobro/$token'
+      path: '/cuenta-de-cobro/$token'
+      fullPath: '/cuenta-de-cobro/$token'
+      preLoaderRoute: typeof CuentaDeCobroTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/reportes': {
       id: '/_authenticated/reportes'
       path: '/reportes'
@@ -422,6 +455,13 @@ declare module '@tanstack/react-router' {
       path: '/entregas'
       fullPath: '/entregas'
       preLoaderRoute: typeof AuthenticatedEntregasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/cuentas-cobro': {
+      id: '/_authenticated/cuentas-cobro'
+      path: '/cuentas-cobro'
+      fullPath: '/cuentas-cobro'
+      preLoaderRoute: typeof AuthenticatedCuentasCobroRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/configuracion': {
@@ -544,6 +584,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedColaRoute: typeof AuthenticatedColaRoute
   AuthenticatedComisionesRoute: typeof AuthenticatedComisionesRoute
   AuthenticatedConfiguracionRoute: typeof AuthenticatedConfiguracionRoute
+  AuthenticatedCuentasCobroRoute: typeof AuthenticatedCuentasCobroRoute
   AuthenticatedEntregasRoute: typeof AuthenticatedEntregasRoute
   AuthenticatedManualRoute: typeof AuthenticatedManualRoute
   AuthenticatedPapeleraRoute: typeof AuthenticatedPapeleraRoute
@@ -563,6 +604,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedColaRoute: AuthenticatedColaRoute,
   AuthenticatedComisionesRoute: AuthenticatedComisionesRoute,
   AuthenticatedConfiguracionRoute: AuthenticatedConfiguracionRoute,
+  AuthenticatedCuentasCobroRoute: AuthenticatedCuentasCobroRoute,
   AuthenticatedEntregasRoute: AuthenticatedEntregasRoute,
   AuthenticatedManualRoute: AuthenticatedManualRoute,
   AuthenticatedPapeleraRoute: AuthenticatedPapeleraRoute,
@@ -589,6 +631,7 @@ const rootRouteChildren: RootRouteChildren = {
   errors404Route: errors404Route,
   errors500Route: errors500Route,
   errors503Route: errors503Route,
+  CuentaDeCobroTokenRoute: CuentaDeCobroTokenRoute,
   SeguimientoCodigoRoute: SeguimientoCodigoRoute,
   SeguimientoIndexRoute: SeguimientoIndexRoute,
 }

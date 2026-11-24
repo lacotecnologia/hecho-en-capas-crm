@@ -20,7 +20,8 @@
     "crear-admin": "tsx scripts/crear-admin.ts",
     "dev:prueba": "VITE_DEMO=1 vite",
     "build:prueba": "VITE_DEMO=1 vite build --base ./ --outDir dist-prueba",
-    "probar:promesa": "tsx scripts/probar-promesa.ts"
+    "probar:promesa": "tsx scripts/probar-promesa.ts",
+    "probar:letras": "tsx scripts/probar-letras.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",

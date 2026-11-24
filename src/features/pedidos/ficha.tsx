@@ -68,6 +68,7 @@ import {
   EstadoEntregaBadge,
 } from '@/features/entregas/entrega'
 import { formatoPesos } from '@/features/taller/formato'
+import { TarjetaCuentaCobro } from '@/features/cuentas-cobro/tarjeta'
 import {
   agregarNota,
   cancelarPedido,
@@ -493,6 +494,10 @@ function Ficha({ p }: { p: PedidoDetalle }) {
                 </p>
               </CardContent>
             </Card>
+          )}
+
+          {esAdmin && !esModoPrueba() && (
+            <TarjetaCuentaCobro pedido={{ id: p.id, codigo: p.codigo }} />
           )}
 
           <Card>
