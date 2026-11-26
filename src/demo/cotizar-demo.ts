@@ -2,6 +2,7 @@
  * Clientes y cotizaciones en la versión de prueba: imita /api/clientes y
  * /api/cotizaciones en el navegador con las mismas reglas del servidor.
  */
+import { TIENE_PEDIDOS } from '@shared/clientes'
 import { agendaPorDefecto } from '@shared/agenda'
 import { type ValoresConfig } from '@shared/configuracion'
 import {
@@ -111,7 +112,14 @@ export function atenderCotizar(
   c: Record<string, unknown>,
   pedidoDe: (
     cotizacionId: number
-  ) => { id: number; codigo: string } | null = () => null
+  ) => { id: number; codigo: string } | null = () => null,
+  pedidosDelCliente: (clienteId: number) => {
+    id: number
+    codigo: string
+    estado: string
+    total: number
+    creadoEn: string
+  }[] = () => []
 ): unknown {
   const esAdmin = u.roles.includes('admin')
   const vende = esAdmin || u.roles.includes('comercial')
@@ -153,6 +161,66 @@ export function atenderCotizar(
         fallo(404, 'No encontramos ese cliente.')
       Object.assign(x, v.datos)
       return { cliente: x }
+    }
+    // Pantalla Clientes (en la prueba todos son del comercial de ejemplo)
+    const cotsDe = (id: number) =>
+      d.cotizaciones
+        .filter((q) => q.clienteId === id)
+        .map((q) => ({
+          id: q.id,
+          codigo: q.codigo,
+          estado: q.estado,
+          total: calcularCotizacion(q.lineas, q.cargos, q.descuento, q.modalidad, config).total,
+          creadoEn: q.creadaEn,
+          comercial: '',
+        }))
+    const pedsDe = (id: number) =>
+      pedidosDelCliente(id).map((x) => ({ ...x, comercial: '' }))
+    const comprado = (id: number) =>
+      pedsDe(id)
+        .filter((x) => x.estado !== 'cancelado')
+        .reduce((t, x) => t + x.total, 0)
+    if (base === '/clientes/lista' && metodo === 'GET') {
+      return {
+        clientes: [...d.clientes]
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+          .map((x) => {
+            const cs = cotsDe(x.id)
+            const ps = pedsDe(x.id)
+            const fechas = [...cs, ...ps].map((m) => m.creadoEn).sort()
+            return {
+              ...x,
+              comercial: { id: u.id, nombre: u.nombre },
+              cotizaciones: cs.length,
+              pedidos: ps.filter((m) => m.estado !== 'cancelado').length,
+              comprado: comprado(x.id),
+              ultimoMovimiento: fechas[fechas.length - 1] ?? null,
+            }
+          }),
+      }
+    }
+    if (r && metodo === 'GET') {
+      const x =
+        d.clientes.find((y) => y.id === Number(r[1])) ??
+        fallo(404, 'No encontramos ese cliente.')
+      const ps = pedsDe(x.id)
+      return {
+        cliente: x,
+        comercial: { id: u.id, nombre: u.nombre },
+        creadoEn: new Date().toISOString(),
+        cotizaciones: cotsDe(x.id),
+        pedidos: ps,
+        comprado: comprado(x.id),
+        noSePuedeBorrar: ps.some((m) => m.estado !== 'cancelado') ? TIENE_PEDIDOS : null,
+        comerciales: esAdmin ? [{ id: u.id, nombre: u.nombre }] : [],
+      }
+    }
+    const rb = base.match(/^\/clientes\/(\d+)\/borrar$/)
+    if (rb && metodo === 'POST') {
+      const id = Number(rb[1])
+      if (pedsDe(id).some((m) => m.estado !== 'cancelado')) fallo(409, TIENE_PEDIDOS)
+      d.clientes = d.clientes.filter((y) => y.id !== id)
+      return { ok: true }
     }
     return undefined
   }

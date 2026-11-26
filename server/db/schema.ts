@@ -219,11 +219,16 @@ export const clientes = pgTable('clientes', {
   ciudad: text('ciudad').notNull().default(''),
   direccion: text('direccion').notNull().default(''),
   documento: text('documento').notNull().default(''),
+  /**
+   * De quién es el cliente: un comercial solo ve los suyos; el admin ve todos
+   * y puede pasarlo a otro comercial.
+   */
+  comercialId: integer('comercial_id').references(() => usuarios.id),
   creadoPor: integer('creado_por').references(() => usuarios.id),
   creadoEn: creadoEn(),
   actualizadoEn: actualizadoEn(),
     ...borrado(),
-})
+}, (t) => [index('clientes_comercial_idx').on(t.comercialId)])
 
 /**
  * Cotizaciones. Cada versión es una fila; todas las versiones comparten

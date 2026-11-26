@@ -48,7 +48,14 @@ import {
 import { VistaPdf } from './vista-pdf'
 
 /** Decide qué mostrar: el editor (borrador) o la cotización ya enviada. */
-export function PantallaCotizacion({ id }: { id: string }) {
+export function PantallaCotizacion({
+  id,
+  clienteId,
+}: {
+  id: string
+  /** Cotización nueva para este cliente (desde su ficha). */
+  clienteId?: number
+}) {
   const usuario = useSesion()
   const puedeEditar = tieneRol(usuario, ['admin', 'comercial'])
   const nueva = id === 'nueva'
@@ -57,7 +64,10 @@ export function PantallaCotizacion({ id }: { id: string }) {
     enabled: !nueva,
   })
 
-  if (nueva) return <EditorCotizacion key='nueva' cotizacion={null} />
+  if (nueva)
+    return (
+      <EditorCotizacion key='nueva' cotizacion={null} clienteId={clienteId} />
+    )
   if (isLoading) {
     return (
       <Pagina titulo='Cotización'>

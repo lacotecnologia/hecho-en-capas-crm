@@ -22,6 +22,7 @@ import {
   productos,
   usuarios,
 } from '../db/schema.js'
+import { impedimentoCliente } from './clientes.js'
 import { conSesion, soloRoles, type Variables } from '../sesion.js'
 
 export const rutasPapelera = new Hono<{ Variables: Variables }>()
@@ -141,6 +142,10 @@ async function impedimento(tipo: TipoPapelera, id: number): Promise<string | nul
     if (p && p.estado !== 'cancelado') {
       return 'Para borrar un pedido, primero cancélalo. Así el stock vuelve a su lugar y sus órdenes salen de la cola.'
     }
+  }
+  if (tipo === 'cliente') {
+    const motivo = await impedimentoCliente(id)
+    if (motivo) return motivo
   }
   if (tipo === 'cotizacion') {
     const [p] = await db

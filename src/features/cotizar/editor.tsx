@@ -54,6 +54,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Campo, CampoNumero } from '@/components/campo'
 import { BotonesColor } from '@/components/color'
 import { Pagina } from '@/components/layout/pagina'
+import { consultaFichaCliente } from '@/features/clientes/api'
 import { consultaConfiguracion } from '@/features/configuracion/api'
 import { consultaProductos } from '@/features/taller/api'
 import { formatoPesos } from '@/features/taller/formato'
@@ -126,8 +127,11 @@ export function Volver() {
 
 export function EditorCotizacion({
   cotizacion,
+  clienteId,
 }: {
   cotizacion: CotizacionDetalle | null
+  /** Para una cotización nueva: el cliente ya escogido (desde su ficha). */
+  clienteId?: number
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -135,9 +139,16 @@ export function EditorCotizacion({
   const { data: catalogo } = useQuery(consultaProductos)
   const tope = config?.tope_comercial ?? 25
 
-  const [cliente, setCliente] = useState<Cliente | null>(
-    cotizacion?.cliente ?? null
+  // undefined = todavía no se escogió (se usa el que vino desde la ficha)
+  const [clienteElegido, setCliente] = useState<Cliente | null | undefined>(
+    cotizacion ? cotizacion.cliente : clienteId ? undefined : null
   )
+  const { data: deLaFicha } = useQuery({
+    ...consultaFichaCliente(clienteId ?? 0),
+    enabled: !cotizacion && !!clienteId,
+  })
+  const cliente =
+    clienteElegido === undefined ? (deLaFicha?.cliente ?? null) : clienteElegido
   const [lineas, setLineas] = useState<LineaForm[]>(
     () =>
       cotizacion?.lineas.map((l) => ({

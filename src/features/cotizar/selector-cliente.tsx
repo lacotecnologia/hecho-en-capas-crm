@@ -21,7 +21,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { BotonBorrar } from '@/components/boton-borrar'
-import { Campo } from '@/components/campo'
+import { clienteVacio } from '@/features/clientes/api'
+import { CamposCliente } from '@/features/clientes/campos'
 import { consultaClientes, crearCliente } from './api'
 
 type Props = {
@@ -189,20 +190,11 @@ function FormCliente({
   onCreado: (c: Cliente) => void
 }) {
   const queryClient = useQueryClient()
-  const [f, setF] = useState({
-    nombre: nombreInicial,
-    whatsapp: '',
-    email: '',
-    ciudad: 'Pereira',
-    direccion: '',
-    documento: '',
-  })
+  const [f, setF] = useState(() => clienteVacio(nombreInicial))
   const [error, setError] = useState<{
     mensaje: string
     campo?: string
   } | null>(null)
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setF((p) => ({ ...p, [k]: e.target.value }))
   const errorDe = (campo: string) =>
     error?.campo === campo ? error.mensaje : undefined
 
@@ -234,64 +226,16 @@ function FormCliente({
       <DialogHeader>
         <DialogTitle>Crear cliente</DialogTitle>
         <DialogDescription>
-          Solo el nombre es obligatorio. El WhatsApp sirve para mandarle la
-          cotización y el seguimiento.
+          Solo el nombre es obligatorio. El cliente queda en tu lista de
+          Clientes; los demás comerciales no lo ven.
         </DialogDescription>
       </DialogHeader>
-      <div className='grid gap-4 sm:grid-cols-2'>
-        <Campo
-          etiqueta='Nombre o empresa'
-          error={errorDe('nombre')}
-          className='sm:col-span-2'
-        >
-          {(id) => (
-            <Input
-              id={id}
-              value={f.nombre}
-              onChange={set('nombre')}
-              autoFocus
-            />
-          )}
-        </Campo>
-        <Campo etiqueta='WhatsApp' error={errorDe('whatsapp')}>
-          {(id) => (
-            <Input
-              id={id}
-              inputMode='tel'
-              placeholder='300 123 4567'
-              value={f.whatsapp}
-              onChange={set('whatsapp')}
-            />
-          )}
-        </Campo>
-        <Campo etiqueta='Correo' error={errorDe('email')}>
-          {(id) => (
-            <Input
-              id={id}
-              type='email'
-              value={f.email}
-              onChange={set('email')}
-            />
-          )}
-        </Campo>
-        <Campo etiqueta='Ciudad'>
-          {(id) => <Input id={id} value={f.ciudad} onChange={set('ciudad')} />}
-        </Campo>
-        <Campo etiqueta='Cédula o NIT' ayuda='Opcional.'>
-          {(id) => (
-            <Input id={id} value={f.documento} onChange={set('documento')} />
-          )}
-        </Campo>
-        <Campo
-          etiqueta='Dirección'
-          ayuda='Para domicilios y envíos.'
-          className='sm:col-span-2'
-        >
-          {(id) => (
-            <Input id={id} value={f.direccion} onChange={set('direccion')} />
-          )}
-        </Campo>
-      </div>
+      <CamposCliente
+        f={f}
+        cambiar={(c) => setF((p) => ({ ...p, ...c }))}
+        errorDe={errorDe}
+        enfocar
+      />
       {error && !error.campo && (
         <p className='text-sm font-medium text-destructive'>{error.mensaje}</p>
       )}

@@ -18,6 +18,7 @@ import {
   fabricaDeLinea,
 } from '../../shared/cotizacion.js'
 import { skuDe } from '../../shared/taller.js'
+import { NO_ES_TUYO } from '../../shared/clientes.js'
 import { getDb } from '../db/index.js'
 import {
   clientes,
@@ -30,6 +31,7 @@ import {
   productos,
   usuarios,
 } from '../db/schema.js'
+import { puedeUsarCliente } from './clientes.js'
 import { conSesion, soloRoles, type UsuarioSesion, type Variables } from '../sesion.js'
 import { estadoTaller, promesaAhora } from '../promesa.js'
 import { coloresDe } from '../stock.js'
@@ -397,6 +399,9 @@ rutasCotizaciones.post('/', vende, async (c) => {
   const r = await armar(e.datos)
   if (!r.ok) return c.json({ mensaje: r.mensaje, campo: r.campo }, 400)
   const u = c.get('usuario')
+  if (e.datos.clienteId && !(await puedeUsarCliente(u, e.datos.clienteId))) {
+    return c.json({ mensaje: NO_ES_TUYO, campo: 'clienteId' }, 400)
+  }
   const anio = anioBogota()
   const db = getDb()
   const id = await db.transaction(async (tx) => {
@@ -438,6 +443,14 @@ rutasCotizaciones.patch('/:id', vende, async (c) => {
   if (!e.ok) return c.json({ mensaje: e.mensaje, campo: e.campo }, 400)
   const r = await armar(e.datos)
   if (!r.ok) return c.json({ mensaje: r.mensaje, campo: r.campo }, 400)
+  // Si cambió de cliente, el nuevo tiene que ser suyo
+  if (
+    e.datos.clienteId &&
+    e.datos.clienteId !== r0.cot.clienteId &&
+    !(await puedeUsarCliente(u, e.datos.clienteId))
+  ) {
+    return c.json({ mensaje: NO_ES_TUYO, campo: 'clienteId' }, 400)
+  }
   const db = getDb()
   await db.transaction(async (tx) => {
     await tx

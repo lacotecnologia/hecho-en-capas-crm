@@ -648,7 +648,17 @@ function atender(estado: EstadoDemo, ruta: string, metodo: string, c: Cuerpo) {
       ruta,
       metodo,
       c,
-      (id) => pedidoDeCotizacion(estado.pedidos, id)
+      (id) => pedidoDeCotizacion(estado.pedidos, id),
+      (clienteId) =>
+        estado.pedidos.pedidos
+          .filter((p) => p.clienteId === clienteId)
+          .map((p) => ({
+            id: p.id,
+            codigo: p.codigo,
+            estado: p.estado,
+            total: p.total,
+            creadoEn: p.creadoEn,
+          }))
     )
     if (respuesta !== undefined) return respuesta
   }

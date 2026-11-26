@@ -56,6 +56,13 @@ export const MENU: GrupoMenu[] = [
         roles: ['admin', 'comercial'],
       },
       {
+        titulo: 'Clientes',
+        url: '/clientes',
+        icono: Users,
+        descripcion: 'Tus clientes: sus datos, cotizaciones y pedidos',
+        roles: ['admin', 'comercial'],
+      },
+      {
         titulo: 'Pedidos',
         url: '/pedidos',
         icono: ClipboardList,
