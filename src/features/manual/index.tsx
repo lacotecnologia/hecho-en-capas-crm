@@ -160,7 +160,7 @@ const SECCIONES: Seccion[] = [
       {
         titulo: 'Marca “Ya se la envié al cliente”',
         texto:
-          'Desde ese momento corren los 10 días que dura la cotización y ya no se puede cambiar. Si hay que cambiar algo, usa “Hacer cambios”: se crea una versión nueva con los precios de hoy.',
+          'Desde ese momento corren los 10 días que dura la cotización. Hasta que se vuelva pedido la puedes cambiar con “Editar cotización” (sigue en el mismo estado); si cambias precios o productos, vuelve a mandarle el PDF.',
       },
       {
         titulo: 'Anota lo que respondió',
@@ -268,7 +268,11 @@ const PREGUNTAS: { p: string; r: string }[] = [
   },
   {
     p: 'Ya envié la cotización y me equivoqué.',
-    r: 'Ábrela y toca “Hacer cambios”: se crea una versión nueva. Mándale la nueva al cliente.',
+    r: 'Ábrela y toca “Editar cotización”, corrige y guarda. Después mándale el PDF de nuevo al cliente. Esto se puede hasta que sea pedido.',
+  },
+  {
+    p: 'Ya es pedido y el cliente quiere cambiar algo.',
+    r: 'Una vez es pedido, solo el administrador lo modifica (productos, precios, entrega) o lo cancela. Tú puedes seguir registrando los pagos. Avísale al administrador.',
   },
   {
     p: 'El cliente pide algo que no está en el catálogo.',

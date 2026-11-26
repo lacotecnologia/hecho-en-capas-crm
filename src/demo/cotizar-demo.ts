@@ -96,7 +96,7 @@ const SIN_PERMISO =
   'No tienes permiso para hacer esto. Pídeselo al administrador.'
 const NO_EXISTE = 'No encontramos esa cotización.'
 const SOLO_BORRADOR =
-  'Esta cotización ya se envió y no se puede cambiar. Usa “Hacer cambios” para crear una versión nueva.'
+  'Esta cotización ya es pedido (o es una versión vieja): ya no se cambia.'
 const ahora = () => new Date().toISOString()
 const sig = (lista: { id: number }[]) =>
   Math.max(0, ...lista.map((x) => x.id)) + 1
@@ -492,11 +492,14 @@ export function atenderCotizar(
     return { cotizacion: detalle(cot) }
   }
 
+  // Hasta que sea pedido se puede cambiar (como en el sistema real)
+  const editable = (cot: CotizacionDemo) =>
+    cot.estado !== 'reemplazada' && !pedidoDe(cot.id)
   let r = ruta.match(/^\/cotizaciones\/(\d+)$/)
   if (r && metodo === 'GET') return { cotizacion: detalle(cargar(r[1], false)) }
   if (r && metodo === 'PATCH') {
     const cot = cargar(r[1], true)
-    if (cot.estado !== 'borrador') fallo(400, SOLO_BORRADOR)
+    if (!editable(cot)) fallo(400, SOLO_BORRADOR)
     const e = leer()
     Object.assign(cot, {
       lineas: armar(e),
@@ -511,9 +514,7 @@ export function atenderCotizar(
   }
   if (r && metodo === 'DELETE') {
     const cot = cargar(r[1], true)
-    if (cot.estado !== 'borrador') {
-      fallo(400, 'Solo se pueden borrar cotizaciones que no se han enviado.')
-    }
+    if (!editable(cot)) fallo(400, SOLO_BORRADOR)
     const anterior = d.cotizaciones.find((x) => x.id === cot.reemplazaId)
     if (anterior?.estado === 'reemplazada') anterior.estado = 'enviada'
     d.cotizaciones = d.cotizaciones.filter((x) => x.id !== cot.id)
@@ -623,7 +624,7 @@ export function atenderCotizar(
   r = ruta.match(/^\/cotizaciones\/(\d+)\/imagenes$/)
   if (r && metodo === 'POST') {
     const cot = cargar(r[1], true)
-    if (cot.estado !== 'borrador') fallo(400, SOLO_BORRADOR)
+    if (!editable(cot)) fallo(400, SOLO_BORRADOR)
     if (cot.imagenes.length >= 8)
       fallo(400, 'Puedes adjuntar hasta 8 imágenes.')
     cot.imagenes.push({
@@ -640,7 +641,7 @@ export function atenderCotizar(
   r = ruta.match(/^\/cotizaciones\/(\d+)\/imagenes\/(\d+)$/)
   if (r && metodo === 'DELETE') {
     const cot = cargar(r[1], true)
-    if (cot.estado !== 'borrador') fallo(400, SOLO_BORRADOR)
+    if (!editable(cot)) fallo(400, SOLO_BORRADOR)
     cot.imagenes = cot.imagenes.filter((i) => i.id !== Number(r![2]))
     return { cotizacion: detalle(cot) }
   }

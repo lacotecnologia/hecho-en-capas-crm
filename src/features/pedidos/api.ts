@@ -113,3 +113,32 @@ export const ordenParaStock = (
 
 export const quitarOrden = (id: number) =>
   api<{ ok: true }>(`/cola/${id}`, { method: 'DELETE' })
+
+export type CuerpoModificar = {
+  lineas: {
+    id: number | null
+    productoId: number
+    cantidad: number
+    precioVenta: number
+    bobinaId: number | null
+    textos: string[]
+  }[]
+  cargos: { concepto: string; valor: number }[]
+  descuento: number
+  notas: string
+  entrega: {
+    modalidad: string
+    direccion: string
+    ciudad: string
+    recibe: string
+    telefono: string
+  } | null
+  fechaCompromiso: string | null
+}
+
+/** Solo el administrador. */
+export const modificarPedido = (id: number, cuerpo: CuerpoModificar) =>
+  api<RespuestaPedido & { sinCambios: boolean }>(`/pedidos/${id}`, {
+    method: 'PUT',
+    body: cuerpo,
+  })

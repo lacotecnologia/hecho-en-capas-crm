@@ -12,6 +12,7 @@ import {
   type PedidoDetalle,
   TIPOS_PAGO_INFO,
 } from '@shared/pedidos'
+import { PEDIDO_MODIFICABLE } from '@shared/editar-pedido'
 import { fechaPrometida } from '@shared/promesa'
 import {
   ArrowLeft,
@@ -23,6 +24,7 @@ import {
   Loader2,
   Lock,
   Package,
+  PencilLine,
   Printer,
   ImagePlus,
   MessageCircle,
@@ -78,6 +80,7 @@ import {
   producirSinAnticipo,
   registrarPago,
 } from './api'
+import { EditarPedido } from './editar'
 import { EstadoOrdenBadge, EstadoPedidoBadge } from './estado'
 import { formatoDiaHora, textoCompromiso } from './fechas'
 
@@ -140,6 +143,24 @@ function Ficha({ p }: { p: PedidoDetalle }) {
   })
 
   const navigate = useNavigate()
+  const [editando, setEditando] = useState(false)
+  const puedeModificar =
+    esAdmin && !esModoPrueba() && PEDIDO_MODIFICABLE.includes(p.estado)
+  // El comercial ya no escribe en el pedido: solo registra pagos
+  const anota = tieneRol(usuario, ['admin', 'fabricacion', 'entregas'])
+  if (editando && puedeModificar) {
+    return (
+      <EditarPedido
+        p={p}
+        onCerrar={() => setEditando(false)}
+        onGuardado={(d) => {
+          poner(d)
+          queryClient.invalidateQueries({ queryKey: ['cuentas-cobro'] })
+          setEditando(false)
+        }}
+      />
+    )
+  }
   const falta = p.total - p.pagado
   const anticipoFalta = anticipoPendiente(p)
   const compromiso = [
@@ -160,6 +181,11 @@ function Ficha({ p }: { p: PedidoDetalle }) {
       acciones={
         <div className='flex flex-wrap items-center gap-2'>
           <EstadoPedidoBadge estado={p.estado} className='text-sm' />
+          {puedeModificar && (
+            <Button variant='outline' onClick={() => setEditando(true)}>
+              <PencilLine /> Modificar pedido
+            </Button>
+          )}
           {p.estado === 'cancelado' && (
             <BotonBorrar
               tipo='pedido'
@@ -388,7 +414,7 @@ function Ficha({ p }: { p: PedidoDetalle }) {
             </Card>
           )}
 
-          <Notas p={p} onCambio={poner} />
+          {anota && <Notas p={p} onCambio={poner} />}
           <Historial p={p} />
         </div>
 
@@ -480,7 +506,7 @@ function Ficha({ p }: { p: PedidoDetalle }) {
                     <Undo2 /> Devolver plata al cliente
                   </Button>
                 )}
-                <Factura p={p} puede={cobra} onCambio={poner} />
+                <Factura p={p} puede={esAdmin} onCambio={poner} />
                 <p className='flex items-center justify-between rounded-lg border border-dashed border-primary/40 p-3 text-sm'>
                   <span>
                     Tu ganancia
@@ -558,7 +584,7 @@ function Ficha({ p }: { p: PedidoDetalle }) {
             </CardContent>
           </Card>
 
-          {cobra &&
+          {esAdmin &&
             !cancelado &&
             ['confirmado', 'en_produccion', 'listo'].includes(p.estado) && (
               <Button

@@ -13,7 +13,9 @@ import {
   FileText,
   Loader2,
   PencilLine,
+  RefreshCw,
   ThumbsDown,
+  Trash2,
   TriangleAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -37,7 +39,7 @@ import { EtiquetaColor } from '@/components/color'
 import { Pagina } from '@/components/layout/pagina'
 import { ConvertirEnPedido } from '@/features/pedidos/convertir'
 import { formatoPesos } from '@/features/taller/formato'
-import { accionCotizacion, consultaCotizacion } from './api'
+import { accionCotizacion, borrarCotizacion, consultaCotizacion } from './api'
 import { EditorCotizacion, Volver } from './editor'
 import {
   EstadoCotizacionBadge,
@@ -59,6 +61,7 @@ export function PantallaCotizacion({
   const usuario = useSesion()
   const puedeEditar = tieneRol(usuario, ['admin', 'comercial'])
   const nueva = id === 'nueva'
+  const [editando, setEditando] = useState(false)
   const { data, isLoading, error } = useQuery({
     ...consultaCotizacion(Number(id)),
     enabled: !nueva,
@@ -86,7 +89,23 @@ export function PantallaCotizacion({
   if (data.estado === 'borrador' && puedeEditar) {
     return <EditorCotizacion key={data.id} cotizacion={data} />
   }
-  return <VerCotizacion cotizacion={data} />
+  // Hasta que sea pedido, el comercial la puede cambiar aunque ya se haya enviado
+  const editable = puedeEditar && !data.pedido && data.estado !== 'reemplazada'
+  if (editando && editable) {
+    return (
+      <EditorCotizacion
+        key={`editar-${data.id}`}
+        cotizacion={data}
+        onTerminar={() => setEditando(false)}
+      />
+    )
+  }
+  return (
+    <VerCotizacion
+      cotizacion={data}
+      onEditar={editable ? () => setEditando(true) : undefined}
+    />
+  )
 }
 
 const AVISO: Record<string, { texto: string; clase: string }> = {
@@ -95,12 +114,13 @@ const AVISO: Record<string, { texto: string; clase: string }> = {
     clase: 'bg-muted',
   },
   enviada: {
-    texto: 'Enviada. Cuando el cliente responda, marca si aceptó o no.',
+    texto:
+      'Enviada. Cuando el cliente responda, marca si aceptó o no. Si pide cambios, toca “Editar cotización”.',
     clase: 'bg-marca-ambar/20',
   },
   aprobada: {
     texto:
-      '¡El cliente aceptó! Conviértela en pedido para que el taller empiece.',
+      '¡El cliente aceptó! Conviértela en pedido para que el taller empiece. Hasta entonces la puedes seguir cambiando.',
     clase: 'bg-primary/10',
   },
   rechazada: {
@@ -109,7 +129,7 @@ const AVISO: Record<string, { texto: string; clase: string }> = {
   },
   vencida: {
     texto:
-      'Pasaron los días de vigencia sin respuesta. Si el cliente aún la quiere, haz una nueva versión con los precios de hoy.',
+      'Pasaron los días de vigencia sin respuesta. Si el cliente aún la quiere, renuévala con los precios de hoy.',
     clase: 'bg-marca-naranja/15',
   },
   reemplazada: {
@@ -118,7 +138,14 @@ const AVISO: Record<string, { texto: string; clase: string }> = {
   },
 }
 
-function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
+function VerCotizacion({
+  cotizacion: c,
+  onEditar,
+}: {
+  cotizacion: CotizacionDetalle
+  /** Se puede cambiar (todavía no es pedido). */
+  onEditar?: () => void
+}) {
   const usuario = useSesion()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -127,6 +154,8 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
   const [pdf, setPdf] = useState(false)
   const [rechazando, setRechazando] = useState(false)
   const [motivo, setMotivo] = useState('')
+  const [borrando, setBorrando] = useState(false)
+  const esAdmin = tieneRol(usuario, ['admin'])
   const vence = c.estado === 'enviada' ? textoVence(c.venceEn) : null
 
   const accion = useMutation({
@@ -387,23 +416,71 @@ function VerCotizacion({ cotizacion: c }: { cotizacion: CotizacionDetalle }) {
                 <Button variant='outline' onClick={() => setRechazando(true)}>
                   <ThumbsDown /> El cliente no aceptó
                 </Button>
-                <Button
-                  variant='outline'
-                  disabled={accion.isPending}
-                  onClick={() => accion.mutate({ tipo: 'nueva-version' })}
-                >
-                  <PencilLine /> Hacer cambios (nueva versión)
-                </Button>
+                {c.estado === 'vencida' && (
+                  <Button
+                    variant='outline'
+                    disabled={accion.isPending}
+                    onClick={() => accion.mutate({ tipo: 'nueva-version' })}
+                  >
+                    <RefreshCw /> Renovar con precios de hoy
+                  </Button>
+                )}
               </>
+            )}
+            {onEditar && (
+              <Button variant='outline' onClick={onEditar}>
+                <PencilLine /> Editar cotización
+              </Button>
             )}
             <Button variant='ghost' onClick={() => setPdf(true)}>
               <FileText /> Ver PDF
             </Button>
+            {onEditar && !esAdmin && (
+              <Button
+                variant='ghost'
+                className='text-muted-foreground'
+                onClick={() => setBorrando(true)}
+              >
+                <Trash2 /> Borrar cotización
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
       <VistaPdf cotizacion={pdf ? c : null} onCerrar={() => setPdf(false)} />
+
+      <Dialog open={borrando} onOpenChange={setBorrando}>
+        <DialogContent className='sm:max-w-sm'>
+          <DialogHeader>
+            <DialogTitle>¿Borrar {c.codigo}?</DialogTitle>
+            <DialogDescription>
+              Ya no saldrá en tu lista. Si el cliente la tiene, avísale que ya
+              no va. El administrador la puede recuperar desde la Papelera.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setBorrando(false)}>
+              No borrar
+            </Button>
+            <Button
+              variant='destructive'
+              onClick={async () => {
+                try {
+                  await borrarCotizacion(c.id)
+                  queryClient.invalidateQueries({ queryKey: ['cotizaciones'] })
+                  toast.success(`${c.codigo} se borró.`)
+                  navigate({ to: '/cotizar' })
+                } catch (e) {
+                  toast.error(mensajeDeError(e))
+                }
+              }}
+            >
+              <Trash2 /> Sí, borrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={rechazando} onOpenChange={setRechazando}>
         <DialogContent className='sm:max-w-md'>

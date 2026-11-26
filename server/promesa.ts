@@ -157,7 +157,7 @@ export async function promesaAhora(
 }
 
 /** Franja de entrega según la hora prometida. */
-function franjaDe(entregaEn: string) {
+export function franjaDe(entregaEn: string) {
   const h = (new Date(entregaEn).getUTCHours() + 24 - 5) % 24
   const m = new Date(entregaEn).getUTCMinutes()
   const min = h * 60 + m

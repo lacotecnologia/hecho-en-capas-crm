@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatoPesos } from '@/features/taller/formato'
 import { consultaCuentasPedido } from './api'
 import { fechaCuenta } from './fechas'
 import { EstadoCuentaBadge, PasosEnvio } from './estado'
@@ -65,6 +66,13 @@ export function TarjetaCuentaCobro({
               />
             </div>
             <PasosEnvio {...data.vigente} angosto />
+            {data.vigente.total !== data.sugerencia.total && (
+              <p className='rounded-lg bg-marca-ambar/15 p-3'>
+                El pedido cambió: esta cuenta de cobro es por{' '}
+                {formatoPesos(data.vigente.total)} y el pedido ahora es por{' '}
+                {formatoPesos(data.sugerencia.total)}. Anúlala y haz una nueva.
+              </p>
+            )}
             <Button onClick={() => setViendo(data.vigente!.id)}>
               <FileText />
               {data.vigente.enviadaEn ? 'Ver cuenta de cobro' : 'Ver y enviar'}

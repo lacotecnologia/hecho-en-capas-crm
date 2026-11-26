@@ -46,8 +46,23 @@ const vende = soloRoles('admin', 'comercial')
 const ve = soloRoles('admin', 'comercial', 'fabricacion')
 
 const NO_EXISTE = 'No encontramos esa cotización.'
-const SOLO_BORRADOR =
-  'Esta cotización ya se envió y no se puede cambiar. Usa “Hacer cambios” para crear una versión nueva.'
+/**
+ * El comercial cambia la cotización como quiera hasta que se vuelve pedido;
+ * después solo el administrador modifica el pedido.
+ */
+async function bloqueoEdicion(cot: { id: number; estado: string }): Promise<string | null> {
+  if (cot.estado === 'reemplazada') {
+    return 'Esta es una versión vieja de la cotización: abre la más nueva para cambiarla.'
+  }
+  const [p] = await getDb()
+    .select({ codigo: pedidos.codigo })
+    .from(pedidos)
+    .where(eq(pedidos.cotizacionId, cot.id))
+  if (p) {
+    return `Esta cotización ya es el pedido ${p.codigo}: ya no se cambia. Si hay que cambiar algo, el administrador modifica el pedido.`
+  }
+  return null
+}
 
 const esAdmin = (u: UsuarioSesion) => u.roles.includes('admin')
 const veGanancia = (u: UsuarioSesion) => esAdmin(u) || u.roles.includes('comercial')
@@ -438,7 +453,8 @@ rutasCotizaciones.patch('/:id', vende, async (c) => {
   const u = c.get('usuario')
   const r0 = await cargar(Number(c.req.param('id')) || 0, u, true)
   if ('error' in r0) return c.json({ mensaje: r0.error }, r0.status)
-  if (r0.cot.estado !== 'borrador') return c.json({ mensaje: SOLO_BORRADOR }, 400)
+  const bloqueo = await bloqueoEdicion(r0.cot)
+  if (bloqueo) return c.json({ mensaje: bloqueo }, 400)
   const e = leerEntradaCotizacion(await c.req.json().catch(() => ({})))
   if (!e.ok) return c.json({ mensaje: e.mensaje, campo: e.campo }, 400)
   const r = await armar(e.datos)
@@ -473,9 +489,8 @@ rutasCotizaciones.patch('/:id', vende, async (c) => {
 rutasCotizaciones.delete('/:id', vende, async (c) => {
   const r = await cargar(Number(c.req.param('id')) || 0, c.get('usuario'), true)
   if ('error' in r) return c.json({ mensaje: r.error }, r.status)
-  if (r.cot.estado !== 'borrador') {
-    return c.json({ mensaje: 'Solo se pueden borrar cotizaciones que no se han enviado.' }, 400)
-  }
+  const bloqueo = await bloqueoEdicion(r.cot)
+  if (bloqueo) return c.json({ mensaje: bloqueo }, 400)
   const db = getDb()
   await db.transaction(async (tx) => {
     // Si era una versión nueva, la anterior vuelve a quedar como estaba
@@ -677,7 +692,8 @@ rutasCotizaciones.post('/:id/imagenes', vende, async (c) => {
   const u = c.get('usuario')
   const r = await cargar(Number(c.req.param('id')) || 0, u, true)
   if ('error' in r) return c.json({ mensaje: r.error }, r.status)
-  if (r.cot.estado !== 'borrador') return c.json({ mensaje: SOLO_BORRADOR }, 400)
+  const bloqueo = await bloqueoEdicion(r.cot)
+  if (bloqueo) return c.json({ mensaje: bloqueo }, 400)
   const cuerpo = await c.req.json().catch(() => ({}))
   const url = String(cuerpo.url ?? '')
   if (!urlDeBlobValida(url)) {
@@ -701,7 +717,8 @@ rutasCotizaciones.delete('/:id/imagenes/:imagenId', vende, async (c) => {
   const u = c.get('usuario')
   const r = await cargar(Number(c.req.param('id')) || 0, u, true)
   if ('error' in r) return c.json({ mensaje: r.error }, r.status)
-  if (r.cot.estado !== 'borrador') return c.json({ mensaje: SOLO_BORRADOR }, 400)
+  const bloqueo = await bloqueoEdicion(r.cot)
+  if (bloqueo) return c.json({ mensaje: bloqueo }, 400)
   await getDb()
     .delete(cotizacionImagenes)
     .where(

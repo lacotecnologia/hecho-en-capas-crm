@@ -156,7 +156,7 @@ export const PASOS: Paso[] = [
     parte: 2,
     titulo: 'Mándaselo al cliente',
     texto:
-      'Descárgalo o compártelo por WhatsApp. Cuando ya se lo mandaste, márcalo: desde ahí corren los 10 días que dura la cotización y no se puede cambiar (si hay que cambiar algo, se hace una versión nueva).',
+      'Descárgalo o compártelo por WhatsApp. Cuando ya se lo mandaste, márcalo: desde ahí corren los 10 días que dura la cotización. Hasta que sea pedido la puedes seguir editando.',
     hazlo: 'Toca “Ya se la envié al cliente”.',
     objetivo: 'ya-envie',
     listo: () => hay('[data-tour=aprobar]'),

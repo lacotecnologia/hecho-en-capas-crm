@@ -11,6 +11,7 @@ import {
   type Cliente,
   type CotizacionDetalle,
   type CotizacionEntrada,
+  ESTADOS_COT_INFO,
   MODALIDADES,
   MODALIDADES_INFO,
   type Modalidad,
@@ -128,11 +129,16 @@ export function Volver() {
 export function EditorCotizacion({
   cotizacion,
   clienteId,
+  onTerminar,
 }: {
   cotizacion: CotizacionDetalle | null
   /** Para una cotización nueva: el cliente ya escogido (desde su ficha). */
   clienteId?: number
+  /** Editando una que ya se envió: volver a verla (al guardar o al salir). */
+  onTerminar?: () => void
 }) {
+  // Ya se envió (enviada, aprobada, rechazada o vencida): se edita y sigue igual
+  const yaEnviada = !!cotizacion && cotizacion.estado !== 'borrador'
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: config } = useQuery(consultaConfiguracion)
@@ -378,9 +384,11 @@ export function EditorCotizacion({
         cotizacion ? `Cotización ${cotizacion.codigo}` : 'Nueva cotización'
       }
       descripcion={
-        cotizacion
-          ? 'Borrador: puedes cambiar lo que quieras hasta enviarla.'
-          : 'Sigue los pasos. El resumen con el total se actualiza mientras escribes.'
+        yaEnviada
+          ? `Estás cambiando una cotización ${ESTADOS_COT_INFO[cotizacion.estado].nombre.toLowerCase()}: sigue así al guardar. Si cambias precios o productos, vuelve a mandarle el PDF al cliente.`
+          : cotizacion
+            ? 'Borrador: puedes cambiar lo que quieras hasta enviarla.'
+            : 'Sigue los pasos. El resumen con el total se actualiza mientras escribes.'
       }
       acciones={
         cotizacion && <EstadoCotizacionBadge estado={cotizacion.estado} />
@@ -393,7 +401,12 @@ export function EditorCotizacion({
           e.preventDefault()
           setError(null)
           guardar.mutate(undefined, {
-            onSuccess: () => toast.success('Borrador guardado.'),
+            onSuccess: () => {
+              if (yaEnviada) {
+                toast.success('Cambios guardados.')
+                onTerminar?.()
+              } else toast.success('Borrador guardado.')
+            },
           })
         }}
       >
@@ -929,7 +942,7 @@ export function EditorCotizacion({
               </div>
             </CardContent>
           </Card>
-          {cotizacion && (
+          {cotizacion && !yaEnviada && (
             <Button
               type='button'
               variant='ghost'
@@ -957,9 +970,20 @@ export function EditorCotizacion({
                 : 'Todo guardado.'}
             </p>
           )}
+          {yaEnviada && (
+            <Button
+              type='button'
+              variant='ghost'
+              size='lg'
+              onClick={() => onTerminar?.()}
+              disabled={guardar.isPending}
+            >
+              Salir sin guardar
+            </Button>
+          )}
           <Button
             type='submit'
-            variant='outline'
+            variant={yaEnviada ? 'default' : 'outline'}
             size='lg'
             className='flex-1 sm:flex-none'
             disabled={guardar.isPending}
@@ -969,7 +993,13 @@ export function EditorCotizacion({
             ) : (
               <Save />
             )}
-            Guardar<span className='hidden sm:inline'> borrador</span>
+            {yaEnviada ? (
+              'Guardar cambios'
+            ) : (
+              <>
+                Guardar<span className='hidden sm:inline'> borrador</span>
+              </>
+            )}
           </Button>
           <Button
             type='button'
@@ -988,7 +1018,7 @@ export function EditorCotizacion({
             }}
           >
             <FileDown />
-            <span data-tour='ver-pdf'>Ver PDF y enviar</span>
+            <span data-tour='ver-pdf'>{yaEnviada ? 'Ver PDF' : 'Ver PDF y enviar'}</span>
           </Button>
         </div>
       </form>
@@ -1009,7 +1039,7 @@ export function EditorCotizacion({
       <VistaPdf
         cotizacion={pdf}
         onCerrar={() => setPdf(null)}
-        onMarcarEnviada={() => pdf && enviar.mutate(pdf.id)}
+        onMarcarEnviada={yaEnviada ? undefined : () => pdf && enviar.mutate(pdf.id)}
         marcando={enviar.isPending}
       />
       <Dialog open={borrando} onOpenChange={setBorrando}>
